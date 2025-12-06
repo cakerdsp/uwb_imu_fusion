@@ -1,5 +1,9 @@
 #include "rclcpp/rclcpp.hpp"
 #include "uwb_imu_fusion/uwb_location_node.hpp"
+// tomorrow:
+// 完成eskf和图优化的融合算法模块
+// 完成状态机算法
+// 实机测试，最起码完成静止测试
 
 int main(int argc, char* argv[]) {
     // 1. 初始化 ROS 2 上下文
