@@ -1,0 +1,30 @@
+Uwb_Location:
+  ros__parameters:
+    # ==========================
+    # 1. ROS 通信配置
+    # ==========================
+    topics:
+      imu_sub: "/imu/data"        # 订阅：IMU话题名称
+      odom_pub: "/odometry/filtered" # 发布：融合后的里程计话题
+    
+    frames:
+      world_frame_id: "map"       # 基站所在的固定坐标系 (Anchor Frame)
+      body_frame_id: "base_link"  # 机器人本体坐标系 (Body Frame)
+
+    # ==========================
+    # 2. 硬件/串口配置
+    # ==========================
+    serial:
+      port_name: "/dev/ttyUSB0"   # UWB 连接的串口端口
+      baud_rate: 115200           # 波特率
+      timeout_ms: 20              # 读取超时时间 (防止串口无数据时程序卡死)
+
+    # ==========================
+    # 3. 基站 (Anchors) 配置
+    # ==========================
+    # 格式：[x, y, z] 单位：米
+    anchors:
+      A0: [0.0, 0.0, 2.5]
+      A1: [5.0, 0.0, 2.5]
+      A2: [0.0, 5.0, 2.5]
+      A3: [5.0, 5.0, 2.5]
