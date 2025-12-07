@@ -1,6 +1,6 @@
 #pragma once
 #include "uwb_imu_fusion/fusion_interface.hpp"
-#include "Uwb_Location/trilateration.h"
+#include "uwb_imu_fusion/trilateration.h"
 #include <vector>
 #include <numeric>
 #include <cmath>
