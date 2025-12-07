@@ -102,7 +102,7 @@ void ESKF::predict(const ImuMeasurement& imu) {
     Fx.block<3, 3>(3, 9) = -R * dt;
 
     // 因为 v_dot = ... + g，所以 delta_v_dot = ... + delta_g
-    Fx.block<3, 3>(3, 15) = Eigen::Matrix3d::Identity() * dt;
+    // Fx.block<3, 3>(3, 15) = Eigen::Matrix3d::Identity() * dt;
 
     Fx.block<3, 3>(6, 6) = delta_q.toRotationMatrix().transpose();
 
