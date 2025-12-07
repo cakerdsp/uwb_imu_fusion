@@ -158,7 +158,6 @@ void UwbLocationNode::imu_callback(const sensor_msgs::msg::Imu::SharedPtr msg) {
             break;
 
         case SysState::RUNNING_FUSION:
-        case SysState::RUNNING_COASTING:
             // 运行阶段：喂给算法进行预测 (Predict)
             fusion_algo_->addImuData(imu);
             
@@ -236,7 +235,7 @@ void UwbLocationNode::timer_callback() {
                 if (init_imu_buf_.size() < 50) {
                     RCLCPP_WARN(this->get_logger(), "Not enough IMU data for init. Retrying...");
                     static_init_start_time_ = current_ros_time; // 重置计时
-                    init_imu_buf_.clear();
+                    // init_imu_buf_.clear();
                     return;
                 }
 
@@ -273,7 +272,7 @@ void UwbLocationNode::timer_callback() {
                 auto frame = frames.back(); // 只取最新
                 for (const auto& anchor_data : frame.anchors) {
                     if (anchors_.find(anchor_data.id) == anchors_.end()) continue;
-                    if (anchor_data.q_value < nlos_q_threshold_) continue; // 质量过滤
+                    if (anchor_data.q_value > nlos_q_threshold_) continue; // 质量过滤
 
                     UwbMeasurement meas;
                     meas.timestamp = current_ts;
@@ -290,39 +289,11 @@ void UwbLocationNode::timer_callback() {
             } else {
                 // 检查超时 (1秒没数据 -> 切盲推)
                 if ((current_ros_time - last_uwb_time_).seconds() > 1.0) {
-                    sys_state_ = SysState::RUNNING_COASTING;
                     RCLCPP_WARN(this->get_logger(), "UWB Lost! Switching to COASTING mode.");
                 }
             }
 
             // B. 发布 Odometry (TF 已经在 imu_callback 发了)
-            NavState state = fusion_algo_->getCurrentState();
-            publish_odometry(state, current_ros_time);
-            break;
-        }
-
-        // -----------------------------------------------------
-        // 阶段 4: RUNNING_COASTING (盲推模式)
-        // -----------------------------------------------------
-        case SysState::RUNNING_COASTING: {
-            // A. 检查 UWB 是否恢复
-            if (!frames.empty()) {
-                // UWB 回来了！
-                sys_state_ = SysState::RUNNING_FUSION;
-                last_uwb_time_ = current_ros_time;
-                RCLCPP_INFO(this->get_logger(), "UWB Recovered. Switching back to FUSION mode.");
-                
-                // 立即处理这一帧
-                // ... (同 FUSION 逻辑，略，下一轮循环会自动处理)
-            } else {
-                // 检查是否丢太久 (比如 20秒) -> 报错或重置
-                if ((current_ros_time - last_uwb_time_).seconds() > 20.0) {
-                    RCLCPP_ERROR(this->get_logger(), "UWB Lost for too long (>20s). Navigation unreliable!");
-                    // 可选: sys_state_ = SysState::SYSTEM_ERROR;
-                }
-            }
-
-            // B. 依然发布 Odometry (基于纯 IMU 预测)
             NavState state = fusion_algo_->getCurrentState();
             publish_odometry(state, current_ros_time);
             break;

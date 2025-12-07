@@ -36,7 +36,6 @@ private:
         IDLE,               // 硬件OK，等待数据
         STATIC_INIT,        // 静止初始化 (2秒)
         RUNNING_FUSION,     // 正常融合
-        RUNNING_COASTING,   // UWB丢失，纯IMU推算
         SYSTEM_ERROR        // 故障
     };
     SysState sys_state_ = SysState::UNINITIALIZED;
