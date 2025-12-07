@@ -23,7 +23,7 @@ void ESKF::initialize(const NavState& init_state) {
     // 初始化时，重置协方差
     P_.setIdentity();
     // 同样需要给重力初始方差，否则它不会收敛
-    P_.block<3, 3>(15, 15) *= 0.01; 
+    // P_.block<3, 3>(15, 15) *= 0.01; 
     // Q_ 初始化，此时未放入时间间因子
     Q_.setZero();
     Q_.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity() * std::pow(config_.acc_noise_std, 2);
@@ -60,7 +60,7 @@ bool ESKF::addUwbData(const UwbMeasurement& uwb) {
 }
 
 // --------------------------------------------------------------------------------
-// Predict: 18维
+// Predict: 15维
 // --------------------------------------------------------------------------------
 void ESKF::predict(const ImuMeasurement& imu) {
     double dt = imu.timestamp - last_imu_time_;
@@ -89,8 +89,8 @@ void ESKF::predict(const ImuMeasurement& imu) {
 
     // --- 2. 误差状态递推 ---
     
-    // 【修改点 3】 Fx 变为 18x18
-    Eigen::Matrix<double, 18, 18> Fx = Eigen::Matrix<double, 18, 18>::Identity();
+    // 【修改点 3】 Fx 变为 15x15
+    Eigen::Matrix<double, 15, 15> Fx = Eigen::Matrix<double, 15, 15>::Identity();
 
     // dp/dv
     Fx.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity() * dt;
@@ -109,8 +109,8 @@ void ESKF::predict(const ImuMeasurement& imu) {
     // dtheta/dbg = -I * dt
     Fx.block<3, 3>(6, 12) = -Eigen::Matrix3d::Identity() * dt;
 
-    // 【修改点 4】 Fi 变为 18x12
-    Eigen::Matrix<double, 18, 12> Fi = Eigen::Matrix<double, 18, 12>::Zero();
+    // 【修改点 4】 Fi 变为 15x12
+    Eigen::Matrix<double, 15, 12> Fi = Eigen::Matrix<double, 15, 12>::Zero();
     Fi.block<3, 3>(3, 0) = R;   // v noise
     Fi.block<3, 3>(6, 3) = Eigen::Matrix3d::Identity(); // theta noise
     Fi.block<3, 3>(9, 6) = Eigen::Matrix3d::Identity(); // ba noise
@@ -123,7 +123,7 @@ void ESKF::predict(const ImuMeasurement& imu) {
 }
 
 // --------------------------------------------------------------------------------
-// Update: 18维
+// Update: 15维
 // --------------------------------------------------------------------------------
 void ESKF::update(const UwbMeasurement& uwb) {
     Eigen::Vector3d p_tag = state_.p;
@@ -135,21 +135,21 @@ void ESKF::update(const UwbMeasurement& uwb) {
 
     double residual = uwb.dist - dist_pred;
 
-    // 【修改点 5】 H 变为 1x18
-    Eigen::Matrix<double, 1, 18> H = Eigen::Matrix<double, 1, 18>::Zero();
+    // 【修改点 5】 H 变为 1x15
+    Eigen::Matrix<double, 1, 15> H = Eigen::Matrix<double, 1, 15>::Zero();
     H.block<1, 3>(0, 0) = diff.transpose() / dist_pred;
     // 重力对位置没有直接观测导数，所以 H 其他部分都是 0
     // 重力是通过 P 矩阵里的相关性 (off-diagonal terms) 间接更新的
 
     double S = (H * P_ * H.transpose())(0, 0) + R_uwb_;
 
-    Eigen::VectorXd K = P_ * H.transpose() / S; // (18x1)
+    Eigen::VectorXd K = P_ * H.transpose() / S; // (15x1)
 
     Eigen::VectorXd delta_x = K * residual;
 
     // P 更新
-    Eigen::Matrix<double, 18, 18> I = Eigen::Matrix<double, 18, 18>::Identity();
-    Eigen::Matrix<double, 18, 18> I_KH = I - K * H;
+    Eigen::Matrix<double, 15, 15> I = Eigen::Matrix<double, 15, 15>::Identity();
+    Eigen::Matrix<double, 15, 15> I_KH = I - K * H;
     P_ = I_KH * P_ * I_KH.transpose();
     P_ += (K * K.transpose()) * R_uwb_;
 
@@ -165,7 +165,7 @@ void ESKF::update(const UwbMeasurement& uwb) {
     state_.bg += delta_x.segment<3>(12);
 
     // 【新增】 注入重力误差
-    state_.g += delta_x.segment<3>(15);
+    // state_.g += delta_x.segment<3>(15);
 }
 
 void ESKF::resetErrorState() {

@@ -27,7 +27,7 @@ private:
     NavState state_;
 
     // 顺序: Error[ Pos(3), Vel(3), Att(3), AccBias(3), GyroBias(3), Gravity(3) ]
-    Eigen::Matrix<double, 18, 18> P_;
+    Eigen::Matrix<double, 15, 15> P_;
 
     // 噪声矩阵 Q 保持 12x12 (重力通常没有过程噪声，或极小)
     // 噪声源: [n_acc, n_gyro, n_ba, n_bg]
