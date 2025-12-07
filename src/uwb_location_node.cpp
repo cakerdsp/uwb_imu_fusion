@@ -12,8 +12,15 @@ UwbLocationNode::UwbLocationNode(const rclcpp::NodeOptions& options)
     load_parameters();
 
     // 2. 初始化算法 (先给个 Dummy 占位，真正初始化在 STATIC_INIT 结束时)
-    if (algo_type_ == "ESKF") {
+    if (algo_type_ == "eskf") {
         fusion_algo_ = std::make_unique<ESKF>();
+        Config config;
+        config.acc_noise_std = this->get_parameter("eskf.acc_noise_std").as_double();
+        config.gyro_noise_std = this->get_parameter("eskf.gyro_noise_std").as_double();
+        config.acc_bias_walk_std = this->get_parameter("eskf.acc_bias_walk_std").as_double();
+        config.gyro_bias_walk_std = this->get_parameter("eskf.gyro_bias_walk_std").as_double();
+        config.uwb_noise_std = this->get_parameter("eskf.uwb_noise_std").as_double();
+        fusion_algo_->setConfig(config);
     } else {
         fusion_algo_ = std::make_unique<DummyAlgo>();
     }
@@ -52,6 +59,11 @@ void UwbLocationNode::load_parameters() {
     this->declare_parameter("serial.timeout_ms", 20);
     this->declare_parameter("algorithm_type", "Dummy");
     this->declare_parameter("NLOS.nlos_q_threshold", 6.0);
+    this->declare_parameter("eskf.acc_noise_std", 0.1);
+    this->declare_parameter("eskf.gyro_noise_std", 0.05);
+    this->declare_parameter("eskf.acc_bias_walk_std", 1e-4);
+    this->declare_parameter("eskf.gyro_bias_walk_std", 1e-5);
+    this->declare_parameter("eskf.uwb_noise_std", 0.15);
 
     world_frame_id_ = this->get_parameter("frames.world_frame_id").as_string();
     body_frame_id_ = this->get_parameter("frames.body_frame_id").as_string();
@@ -275,7 +287,7 @@ void UwbLocationNode::timer_callback() {
                     if (anchor_data.q_value > nlos_q_threshold_) continue; // 质量过滤
 
                     UwbMeasurement meas;
-                    meas.timestamp = current_ts;
+                    meas.timestamp = current_ts; // 只是处理时间，和最初的数据时间可能不一样，但是由于速度变化不大，所以可用
                     meas.anchor_id = anchor_data.id;
                     meas.anchor_pos = anchors_[anchor_data.id];
                     meas.dist = anchor_data.dist;

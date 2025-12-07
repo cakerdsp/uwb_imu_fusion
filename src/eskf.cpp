@@ -172,4 +172,8 @@ void ESKF::resetErrorState() {
     // 逻辑清零
 }
 
+void ESKF::setConfig(const Config& config) {
+    config_ = config;
+}
+
 } // namespace uwb_imu_fusion

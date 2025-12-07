@@ -22,6 +22,15 @@ Uwb_Location:
     NLOS:
       nlos_q_threshold: 6.0            # NLOS 判定阈值 (根据实际环境调整)
 
+    algorithm_type: "eskf"  # 可选：eskf / graph
+
+    eskf:
+      acc_noise_std: 0.1
+      gyro_noise_std: 0.05
+      acc_bias_walk_std: 1e-4
+      gyro_bias_walk_std: 1e-5
+      uwb_noise_std: 0.15
+
     # ==========================
     # 3. 基站 (Anchors) 配置
     # ==========================

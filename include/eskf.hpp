@@ -1,6 +1,6 @@
 #pragma once
 
-#include "uwb_imu_fusion/data_types.hpp"
+#include "uwb_imu_fusion/fusion_interface.hpp"
 #include <Eigen/Dense>
 #include <iostream>
 
@@ -14,6 +14,7 @@ public:
     void initialize(const NavState& init_state) override;
     void addImuData(const ImuMeasurement& imu) override;
     bool addUwbData(const UwbMeasurement& uwb) override;
+    void setConfig(const Config& config) override;
     NavState getCurrentState() override;
 
 private:
@@ -35,13 +36,7 @@ private:
 
     double R_uwb_;
 
-    struct Config {
-        double acc_noise_std = 0.1;
-        double gyro_noise_std = 0.05;
-        double acc_bias_walk_std = 1e-4;
-        double gyro_bias_walk_std = 1e-5;
-        double uwb_noise_std = 0.15;
-    } config_;
+    Config config_;
 };
 
 } // namespace uwb_imu_fusion

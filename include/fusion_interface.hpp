@@ -37,6 +37,15 @@ struct UwbMeasurement {
     double q_value;
 };
 
+struct Config {
+    // eskf
+    double acc_noise_std = 0.1;
+    double gyro_noise_std = 0.05;
+    double acc_bias_walk_std = 1e-4;
+    double gyro_bias_walk_std = 1e-5;
+    double uwb_noise_std = 0.15;
+};
+
 // 设计的策略模式接口，兼容 ESKF 和 Graph
 class FusionInterface {
 public:
@@ -47,6 +56,8 @@ public:
     
     // 处理 UWB 数据，如果状态更新了返回 true
     virtual bool addUwbData(const UwbMeasurement& uwb) = 0;
+
+    virtual void setConfig(const Config& config) = 0;
     
     virtual NavState getCurrentState() = 0;
 };
