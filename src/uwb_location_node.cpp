@@ -1,31 +1,29 @@
 #include "uwb_imu_fusion/uwb_location_node.hpp"
-#include <regex>
+#include "uwb_imu_fusion/initializer.hpp" // 引入初始化工具
 
 namespace uwb_imu_fusion {
 
 UwbLocationNode::UwbLocationNode(const rclcpp::NodeOptions& options)
     : Node("Uwb_Location", rclcpp::NodeOptions(options).automatically_declare_parameters_from_overrides(true)) {
     
-    RCLCPP_INFO(this->get_logger(), "Starting Uwb_Location Node.");
+    RCLCPP_INFO(this->get_logger(), "Starting Uwb_Location Node (Industrial FSM Version).");
 
-    // 1. 加载参数 (YAML)
+    // 1. 加载参数
     load_parameters();
 
-    // 2. 初始化算法模块
-    // 此时仅使用占位符，后续根据 algo_type_ 实例化具体算法
-    fusion_algo_ = std::make_unique<DummyAlgo>(); 
-    
-    // 初始化算法状态 (重力 g 已在 NavState 构造函数中默认设为 -9.81)
-    NavState init_state;
-    fusion_algo_->initialize(init_state);
+    // 2. 初始化算法 (先给个 Dummy 占位，真正初始化在 STATIC_INIT 结束时)
+    if (algo_type_ == "ESKF") {
+        fusion_algo_ = std::make_unique<ESKF>();
+    } else {
+        fusion_algo_ = std::make_unique<DummyAlgo>();
+    }
 
     // 3. 初始化硬件
-    init_hardware();
+    init_hardware(); 
+    // 如果硬件初始化成功，状态会转为 IDLE (在 init_hardware 里设置)
 
     // 4. 初始化 ROS 通信
     auto qos = rclcpp::SensorDataQoS();
-    
-    // 从参数获取话题名称
     std::string imu_topic = this->get_parameter("topics.imu_sub").as_string();
     std::string odom_topic = this->get_parameter("topics.odom_pub").as_string();
 
@@ -36,7 +34,7 @@ UwbLocationNode::UwbLocationNode(const rclcpp::NodeOptions& options)
     odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(odom_topic, 10);
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
-    // 5. 启动定时器 (50Hz / 20ms) 用于串口轮询
+    // 5. 启动主循环定时器 (50Hz)
     int timeout_ms = this->get_parameter("serial.timeout_ms").as_int();
     timer_ = this->create_wall_timer(
         std::chrono::milliseconds(timeout_ms),
@@ -135,50 +133,204 @@ void UwbLocationNode::init_hardware() {
 
     if (serial_reader_.open(port, baud)) {
         RCLCPP_INFO(this->get_logger(), "Serial port opened: %s", port.c_str());
+        sys_state_ = SysState::IDLE; // 硬件OK，进入待机
     } else {
-        RCLCPP_ERROR(this->get_logger(), "Failed to open serial port. Check permissions/connection.");
+        RCLCPP_ERROR(this->get_logger(), "Failed to open serial port!");
+        sys_state_ = SysState::SYSTEM_ERROR;
     }
 }
 
+// -------------------------------------------------------------------------
+// IMU 回调: 高频 (100Hz+)
+// -------------------------------------------------------------------------
 void UwbLocationNode::imu_callback(const sensor_msgs::msg::Imu::SharedPtr msg) {
     ImuMeasurement imu;
-    // 使用 IMU 消息自带的时间戳
-    imu.timestamp = rclcpp::Time(msg->header.stamp).seconds();
+    rclcpp::Time stamp = msg->header.stamp;
+    imu.timestamp = stamp.seconds();
     imu.acc << msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z;
     imu.gyro << msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z;
 
-    // 仅传入 acc 和 gyro 进行预测，不传入 orientation，确保不进行错误的姿态更新
-    fusion_algo_->addImuData(imu);
-    NavState current_state = fusion_algo_->getCurrentState();
-    publish_tf(current_state, current_ros_time);
+    // 状态机分流
+    switch (sys_state_) {
+        case SysState::STATIC_INIT:
+            // 初始化阶段：只存数据，不跑算法
+            init_imu_buf_.push_back(imu);
+            break;
+
+        case SysState::RUNNING_FUSION:
+        case SysState::RUNNING_COASTING:
+            // 运行阶段：喂给算法进行预测 (Predict)
+            fusion_algo_->addImuData(imu);
+            
+            // 【关键】利用高频 IMU 发布 TF，保证丝滑
+            // 注意：此时 getCurrentState 返回的是刚刚 Predict 后的状态
+            {
+                NavState state = fusion_algo_->getCurrentState();
+                publish_tf(state, stamp);
+            }
+            break;
+
+        default:
+            break; // 其他状态忽略 IMU
+    }
 }
 
+// -------------------------------------------------------------------------
+// 定时器回调: 低频 (50Hz) - 处理 UWB + 状态流转 + Odom发布
+// -------------------------------------------------------------------------
 void UwbLocationNode::timer_callback() {
-    // 隐式同步：使用当前接收时间作为测量时间
     rclcpp::Time current_ros_time = this->now();
     double current_ts = current_ros_time.seconds();
-    // 读取并解析数据
+
+    // 读取 UWB 数据
     auto frames = serial_reader_.read_and_parse();
-    if (frames.empty()) return;
-    auto frame = frames.back();
 
-    for (const auto& anchor_data : frame.anchors) {
-        // 过滤未知的基站 ID
-        if (anchors_.find(anchor_data.id) == anchors_.end() || anchor_data.q_value > nlos_q_threshold_) continue;
+    // 状态机主逻辑
+    switch (sys_state_) {
+        
+        // -----------------------------------------------------
+        // 阶段 0: 异常
+        // -----------------------------------------------------
+        case SysState::SYSTEM_ERROR:
+            // 可在此处尝试重连串口...
+            return;
 
-        UwbMeasurement meas;
-        meas.timestamp = current_ts;
-        meas.anchor_id = anchor_data.id;
-        meas.anchor_pos = anchors_[anchor_data.id];
-        meas.dist = anchor_data.dist;
-        meas.q_value = anchor_data.q_value;
+        // -----------------------------------------------------
+        // 阶段 1: IDLE (等待传感器数据就绪)
+        // -----------------------------------------------------
+        case SysState::IDLE:
+            // 检查是否有有效数据流入
+            if (!frames.empty()) {
+                // 收到第一帧数据，开始静止初始化
+                sys_state_ = SysState::STATIC_INIT;
+                static_init_start_time_ = current_ros_time;
+                
+                // 清空 Buffer
+                init_imu_buf_.clear();
+                init_uwb_buf_.clear();
+                
+                RCLCPP_INFO(this->get_logger(), "Sensors detected. Start STATIC INIT (2s). Please keep robot STILL!");
+            }
+            break;
 
-        // 执行更新。若状态发生显著变化（更新成功），发布里程计
-        fusion_algo_->addUwbData(meas);
+        // -----------------------------------------------------
+        // 阶段 2: STATIC_INIT (静止初始化)
+        // -----------------------------------------------------
+        case SysState::STATIC_INIT: {
+            // A. 收集 UWB 数据 (如果有)
+            if (!frames.empty()) {
+                auto frame = frames.back();
+                for (const auto& anchor_data : frame.anchors) {
+                    if (anchors_.find(anchor_data.id) == anchors_.end()) continue;
+                    UwbMeasurement meas;
+                    meas.anchor_pos = anchors_[anchor_data.id];
+                    meas.dist = anchor_data.dist;
+                    init_uwb_buf_.push_back(meas);
+                }
+            }
+            
+            // B. 检查时间是否足够 (2秒)
+            if ((current_ros_time - static_init_start_time_).seconds() > 2.0) {
+                
+                // 检查数据量是否足够
+                if (init_imu_buf_.size() < 50) {
+                    RCLCPP_WARN(this->get_logger(), "Not enough IMU data for init. Retrying...");
+                    static_init_start_time_ = current_ros_time; // 重置计时
+                    init_imu_buf_.clear();
+                    return;
+                }
+
+                // --- 核心初始化逻辑 ---
+                RCLCPP_INFO(this->get_logger(), "Calculating initial state...");
+
+                // 1. 算出初始状态 (Roll, Pitch, Bias)
+                NavState init_state = Initializer::alignIMU(init_imu_buf_);
+                
+                // 2. 算出初始位置 (调用你的三边定位库)
+                init_state.p = Initializer::solveTrilateration(init_uwb_buf_);
+                
+                // 3. 补上时间戳
+                init_state.timestamp = current_ts;
+
+                // 4. 初始化算法 (ESKF 内部会设置大方差 P 矩阵)
+                fusion_algo_->initialize(init_state);
+                
+                // 5. 切换状态
+                sys_state_ = SysState::RUNNING_FUSION;
+                last_uwb_time_ = current_ros_time; // 初始化看门狗
+                
+                RCLCPP_INFO(this->get_logger(), "Initialization Done. ESKF Running (Fusion Mode).");
+            }
+            break;
+        }
+
+        // -----------------------------------------------------
+        // 阶段 3: RUNNING_FUSION (正常融合)
+        // -----------------------------------------------------
+        case SysState::RUNNING_FUSION: {
+            // A. 处理 UWB 数据 (Update)
+            if (!frames.empty()) {
+                auto frame = frames.back(); // 只取最新
+                for (const auto& anchor_data : frame.anchors) {
+                    if (anchors_.find(anchor_data.id) == anchors_.end()) continue;
+                    if (anchor_data.q_value < nlos_q_threshold_) continue; // 质量过滤
+
+                    UwbMeasurement meas;
+                    meas.timestamp = current_ts;
+                    meas.anchor_id = anchor_data.id;
+                    meas.anchor_pos = anchors_[anchor_data.id];
+                    meas.dist = anchor_data.dist;
+                    meas.q_value = anchor_data.q_value;
+
+                    // 执行更新
+                    fusion_algo_->addUwbData(meas);
+                }
+                // 喂狗
+                last_uwb_time_ = current_ros_time;
+            } else {
+                // 检查超时 (1秒没数据 -> 切盲推)
+                if ((current_ros_time - last_uwb_time_).seconds() > 1.0) {
+                    sys_state_ = SysState::RUNNING_COASTING;
+                    RCLCPP_WARN(this->get_logger(), "UWB Lost! Switching to COASTING mode.");
+                }
+            }
+
+            // B. 发布 Odometry (TF 已经在 imu_callback 发了)
+            NavState state = fusion_algo_->getCurrentState();
+            publish_odometry(state, current_ros_time);
+            break;
+        }
+
+        // -----------------------------------------------------
+        // 阶段 4: RUNNING_COASTING (盲推模式)
+        // -----------------------------------------------------
+        case SysState::RUNNING_COASTING: {
+            // A. 检查 UWB 是否恢复
+            if (!frames.empty()) {
+                // UWB 回来了！
+                sys_state_ = SysState::RUNNING_FUSION;
+                last_uwb_time_ = current_ros_time;
+                RCLCPP_INFO(this->get_logger(), "UWB Recovered. Switching back to FUSION mode.");
+                
+                // 立即处理这一帧
+                // ... (同 FUSION 逻辑，略，下一轮循环会自动处理)
+            } else {
+                // 检查是否丢太久 (比如 20秒) -> 报错或重置
+                if ((current_ros_time - last_uwb_time_).seconds() > 20.0) {
+                    RCLCPP_ERROR(this->get_logger(), "UWB Lost for too long (>20s). Navigation unreliable!");
+                    // 可选: sys_state_ = SysState::SYSTEM_ERROR;
+                }
+            }
+
+            // B. 依然发布 Odometry (基于纯 IMU 预测)
+            NavState state = fusion_algo_->getCurrentState();
+            publish_odometry(state, current_ros_time);
+            break;
+        }
+        
+        default:
+            break;
     }
-    NavState current_state = fusion_algo_->getCurrentState();
-    publish_odometry(current_state,current_ros_time);
-    publish_tf(current_state, current_ros_time);
 }
 
 void UwbLocationNode::publish_odometry(const NavState& state, const rclcpp::Time& stamp) {
@@ -229,4 +381,5 @@ void UwbLocationNode::publish_tf(const NavState& state, const rclcpp::Time& stam
     // 发送 TF
     tf_broadcaster_->sendTransform(t);
 }
+
 } // namespace uwb_imu_fusion

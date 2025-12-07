@@ -6,15 +6,9 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 
-// 包含之前写好的模块
-#include "serial_reader.hpp"   
-#include "fusion_interface.hpp" 
-
-#include <string>
-#include <vector>
-#include <map>
-#include <memory>
-#include <chrono>
+#include "uwb_imu_fusion/fusion_interface.hpp" // 包含接口
+#include "uwb_imu_fusion/eskf.hpp"           // 包含实现
+#include "uwb_imu_fusion/serial_reader.hpp"
 
 namespace uwb_imu_fusion {
 
@@ -24,41 +18,53 @@ public:
     ~UwbLocationNode() = default;
 
 private:
-    // --- 核心流程函数 ---
     void load_parameters();
     void init_hardware();
     
-    // --- 回调函数 ---
+    // 回调函数
     void imu_callback(const sensor_msgs::msg::Imu::SharedPtr msg);
-    void timer_callback(); // 串口轮询 & 主逻辑
+    void timer_callback();
 
-    // --- 辅助函数 ---
+    // 发布函数
     void publish_odometry(const NavState& state, const rclcpp::Time& stamp);
     void publish_tf(const NavState& state, const rclcpp::Time& stamp);
 
-    // --- 成员变量 ---
-    
-    // 1. 算法核心 (多态指针，支持 ESKF/Graph 切换)
-    std::unique_ptr<FusionInterface> fusion_algo_;
+private:
+    // --- 状态机定义 ---
+    enum class SysState {
+        UNINITIALIZED,      // 刚启动
+        IDLE,               // 硬件OK，等待数据
+        STATIC_INIT,        // 静止初始化 (2秒)
+        RUNNING_FUSION,     // 正常融合
+        RUNNING_COASTING,   // UWB丢失，纯IMU推算
+        SYSTEM_ERROR        // 故障
+    };
+    SysState sys_state_ = SysState::UNINITIALIZED;
 
-    // 2. 硬件驱动
-    SerialReader serial_reader_;
+    // --- 初始化专用缓冲区 ---
+    std::vector<ImuMeasurement> init_imu_buf_;
+    std::vector<UwbMeasurement> init_uwb_buf_;
+    rclcpp::Time static_init_start_time_;
 
-    // 3. ROS 通信
+    // --- 运行时监控 ---
+    rclcpp::Time last_uwb_time_; // 看门狗
+
+    // --- ROS 组件 ---
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
     rclcpp::TimerBase::SharedPtr timer_;
 
-    // 4. 配置参数
+    // --- 模块 ---
+    SerialReader serial_reader_;
+    std::unique_ptr<FusionInterface> fusion_algo_;
+
+    // --- 参数 ---
+    std::map<int, Eigen::Vector3d> anchors_;
     std::string world_frame_id_;
     std::string body_frame_id_;
-    std::string algo_type_; // "ESKF" or "Dummy"
-    double nlos_q_threshold_;  // NLOS 判定阈值
-    
-    // 基站映射表: Anchor ID -> [x, y, z]
-    // 例如: 0 -> [0.0, 0.0, 2.5]
-    std::map<int, Eigen::Vector3d> anchors_;
+    std::string algo_type_;
+    double nlos_q_threshold_;
 };
 
 } // namespace uwb_imu_fusion
