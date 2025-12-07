@@ -19,7 +19,7 @@ ESKF::ESKF() {
 void ESKF::initialize(const NavState& init_state) {
     state_ = init_state;
     last_imu_time_ = init_state.timestamp;
-    
+    state_.g << 0.0, 0.0, -9.81;
     // 初始化时，重置协方差
     P_.setIdentity();
     // 同样需要给重力初始方差，否则它不会收敛
