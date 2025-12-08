@@ -1,4 +1,4 @@
-#include "uwb_imu_fusion/eskf.hpp"
+#include "eskf.hpp"
 #include <cmath>
 
 namespace uwb_imu_fusion {
@@ -165,10 +165,6 @@ void ESKF::update(const UwbMeasurement& uwb) {
 
     // 【新增】 注入重力误差
     // state_.g += delta_x.segment<3>(15);
-}
-
-void ESKF::resetErrorState() {
-    // 逻辑清零
 }
 
 void ESKF::setConfig(const Config& config) {

@@ -32,9 +32,9 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     
     # 创建UWB驱动节点
-    uwb_driver_node = Node(
+    uwb_pub_node = Node(
         package='uwb_imu_fusion',
-        executable='uwb_driver_node',
+        executable='uwb_pub_node',
         name='uwb_pub_node',
         output='screen',
         parameters=[
@@ -65,7 +65,7 @@ def generate_launch_description():
         LogInfo(msg=['launch uwb_imu_fusion nodes']),
         config_file_arg,
         use_sim_time_arg,
-        uwb_driver_node,
+        uwb_pub_node,
         uwb_imu_fusion_node,
     ])
 

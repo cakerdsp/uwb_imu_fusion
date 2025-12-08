@@ -1,4 +1,4 @@
-#include "uwb_imu_fusion/serial_reader.hpp"
+#include "serial_reader.hpp"
 
 #include <fcntl.h>
 #include <termios.h>

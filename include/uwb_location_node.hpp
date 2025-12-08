@@ -7,8 +7,8 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include "uwb_imu_fusion/msg/uwb.hpp"
 
-#include "uwb_imu_fusion/fusion_interface.hpp" // 包含接口
-#include "uwb_imu_fusion/eskf.hpp"           // 包含实现
+#include "fusion_interface.hpp" // 包含接口
+#include "eskf.hpp"           // 包含实现
 
 namespace uwb_imu_fusion {
 

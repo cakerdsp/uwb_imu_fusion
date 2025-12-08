@@ -1,6 +1,6 @@
 #pragma once
 
-#include "uwb_imu_fusion/fusion_interface.hpp"
+#include "fusion_interface.hpp"
 #include <Eigen/Dense>
 #include <iostream>
 
