@@ -62,7 +62,9 @@ UwbLocationNode::UwbLocationNode(const rclcpp::NodeOptions& options)
         viz_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
             "uwb/visualization", latching_qos);
 
-        publish_anchors_viz();
+        viz_timer_ = this->create_wall_timer(
+            std::chrono::seconds(1),
+            std::bind(&UwbLocationNode::publish_anchors_viz, this));
     }
 
     if(show_raw_uwb_position_) {
