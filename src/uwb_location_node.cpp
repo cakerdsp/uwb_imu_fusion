@@ -51,6 +51,19 @@ UwbLocationNode::UwbLocationNode(const rclcpp::NodeOptions& options)
     timer_ = this->create_wall_timer(
         std::chrono::milliseconds(20), // 50Hz
         std::bind(&UwbLocationNode::timer_callback, this));
+
+    // 6. 初始化可视化
+    rclcpp::QoS latching_qos(1);
+    latching_qos.transient_local();
+    latching_qos.reliable();
+
+    viz_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
+        "uwb/visualization", latching_qos);
+
+    // 启动低频定时器 (1Hz 足够了，因为基站是静态的)
+    viz_timer_ = this->create_wall_timer(
+        std::chrono::seconds(1),
+        std::bind(&UwbLocationNode::timer_viz_callback, this));
 }
 
 void UwbLocationNode::load_parameters() {
@@ -369,4 +382,69 @@ void UwbLocationNode::publish_tf(const NavState& state, const rclcpp::Time& stam
     tf_broadcaster_->sendTransform(t);
 }
 
+
+void UwbLocationNode::timer_viz_callback() {
+    // 如果没有订阅者，就不消耗 CPU 去构建消息
+    if (viz_pub_->get_subscription_count() == 0) {
+        return;
+    }
+
+    visualization_msgs::msg::MarkerArray msg;
+    rclcpp::Time now = this->now();
+
+    // 遍历所有基站
+    for (auto const& [id, pos] : anchors_) {
+        // 1. 基站球体 (Sphere)
+        visualization_msgs::msg::Marker sphere;
+        sphere.header.frame_id = world_frame_id_;
+        sphere.header.stamp = now;
+        sphere.ns = "anchors";
+        sphere.id = id;
+        sphere.type = visualization_msgs::msg::Marker::SPHERE;
+        sphere.action = visualization_msgs::msg::Marker::ADD;
+        
+        sphere.pose.position.x = pos.x();
+        sphere.pose.position.y = pos.y();
+        sphere.pose.position.z = pos.z();
+        sphere.pose.orientation.w = 1.0;
+
+        sphere.scale.x = 0.2; // 20cm 直径
+        sphere.scale.y = 0.2;
+        sphere.scale.z = 0.2;
+
+        sphere.color.r = 0.0f;
+        sphere.color.g = 1.0f; // 绿色
+        sphere.color.b = 0.0f;
+        sphere.color.a = 0.8f;
+        
+        // 永久存在 (直到节点关闭)
+        sphere.lifetime = rclcpp::Duration::from_seconds(0); 
+
+        msg.markers.push_back(sphere);
+
+        // 2. 基站文字标签 (Text)
+        visualization_msgs::msg::Marker text;
+        text.header = sphere.header;
+        text.ns = "anchor_labels";
+        text.id = id;
+        text.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
+        text.action = visualization_msgs::msg::Marker::ADD;
+
+        text.pose.position = sphere.pose.position;
+        text.pose.position.z += 0.3; // 文字显示在球体上方
+
+        text.scale.z = 0.2; // 文字高度
+        text.color.r = 1.0f;
+        text.color.g = 1.0f;
+        text.color.b = 1.0f;
+        text.color.a = 1.0f;
+
+        text.text = "A" + std::to_string(id);
+        text.lifetime = rclcpp::Duration::from_seconds(0);
+
+        msg.markers.push_back(text);
+    }
+
+    viz_pub_->publish(msg);
+}
 } // namespace uwb_imu_fusion

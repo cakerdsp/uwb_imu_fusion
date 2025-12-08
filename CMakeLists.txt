@@ -147,6 +147,12 @@ install(DIRECTORY config/
   FILES_MATCHING PATTERN "*.yaml"
 )
 
+# 安装rviz配置文件
+install(DIRECTORY rviz/
+  DESTINATION share/${PROJECT_NAME}/rviz
+  FILES_MATCHING PATTERN "*.rviz"
+)
+
 # 导出依赖
 ament_export_include_directories(include)
 ament_export_dependencies(

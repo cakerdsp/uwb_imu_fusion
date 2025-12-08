@@ -6,7 +6,7 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include "uwb_imu_fusion/msg/uwb.hpp"
-
+#include "visualization_msgs/msg/marker_array.hpp"
 #include "fusion_interface.hpp" // 包含接口
 #include "eskf.hpp"           // 包含实现
 
@@ -64,6 +64,14 @@ private:
     std::string body_frame_id_;
     std::string algo_type_;
     double nlos_q_threshold_;
+
+
+    // 可视化相关
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr viz_pub_;
+    rclcpp::TimerBase::SharedPtr viz_timer_;
+
+    // 专门用于发布基站的可视化
+    void timer_viz_callback();
 };
 
 } // namespace uwb_imu_fusion

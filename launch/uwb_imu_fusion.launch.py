@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, LogInfo
+from launch.actions import DeclareLaunchArgument, LogInfo, ExecuteProcess
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -61,11 +61,26 @@ def generate_launch_description():
         ]
     )
     
+    # 获取rviz配置文件路径
+    rviz_config_file = PathJoinSubstitution([
+        pkg_share,
+        'rviz',
+        'config.rviz'
+    ])
+    
+    # 创建RViz节点
+    rviz_node = ExecuteProcess(
+        cmd=['rviz2', '-d', rviz_config_file],
+        output='screen',
+        name='rviz2'
+    )
+    
     return LaunchDescription([
         LogInfo(msg=['launch uwb_imu_fusion nodes']),
         config_file_arg,
         use_sim_time_arg,
         uwb_pub_node,
         uwb_imu_fusion_node,
+        rviz_node,
     ])
 
