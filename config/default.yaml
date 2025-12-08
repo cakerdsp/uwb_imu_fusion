@@ -1,8 +1,8 @@
 uwb_pub_node:
   ros__parameters:
-    port_name: "/dev/ttyUSB0"   # UWB 连接的串口端口
+    port_name: "/dev/uwb"   # UWB 连接的串口端口
     baud_rate: 115200           # 波特率
-    frame_id: "uwb_link"        # UWB消息的frame_id
+    frame_id: "camera_link"        # UWB消息的frame_id
     uwb_pub: "/uwb/data"      # 发布的UWB话题名称
 
 uwb_imu_fusion:
@@ -11,13 +11,13 @@ uwb_imu_fusion:
     # 1. ROS 通信配置
     # ==========================
     topics:
-      imu_sub: "/imu/data"        # 订阅：IMU话题名称
+      imu_sub: "/egg_hw/imu"        # 订阅：IMU话题名称
       uwb_sub: "/uwb/data"        # 订阅：UWB话题名称（由uwb_pub_node发布）
       odom_pub: "/odometry/filtered" # 发布：融合后的里程计话题
     
     frames:
       world_frame_id: "map"       # 基站所在的固定坐标系 (Anchor Frame)
-      body_frame_id: "base_link"  # 机器人本体坐标系 (Body Frame)
+      body_frame_id: "camera_link"  # 机器人本体坐标系 (Body Frame)
 
     # ==========================
     # 2. 硬件/串口配置
@@ -40,7 +40,7 @@ uwb_imu_fusion:
     # ==========================
     # 格式：[x, y, z] 单位：米
     anchors:
-      A0: [0.0, 0.0, 2.5]
-      A1: [5.0, 0.0, 2.5]
-      A2: [0.0, 5.0, 2.5]
-      A3: [5.0, 5.0, 2.5]
+      A0: [0.0, 0.0, 0.0]
+      A1: [9.25, 0.0, 0.0]
+      A2: [0.0, 6.10, 0.0]
+      # A3: [5.0, 5.0, 0.0]
