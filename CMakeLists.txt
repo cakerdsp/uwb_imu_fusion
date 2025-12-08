@@ -15,6 +15,7 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
@@ -82,6 +83,7 @@ ament_target_dependencies(${PROJECT_NAME}_node
   sensor_msgs
   nav_msgs
   geometry_msgs
+  visualization_msgs
   tf2_ros
   tf2
   tf2_geometry_msgs
@@ -104,6 +106,7 @@ add_executable(uwb_pub_node src/uwb.cpp src/serial_reader.cpp)
 ament_target_dependencies(uwb_pub_node
   rclcpp
   geometry_msgs
+  visualization_msgs
 )
 
 # 链接自定义消息
@@ -160,6 +163,7 @@ ament_export_dependencies(
   sensor_msgs
   nav_msgs
   geometry_msgs
+  visualization_msgs
   tf2_ros
   tf2
   tf2_geometry_msgs
