@@ -88,7 +88,7 @@ void UwbLocationNode::load_parameters() {
     world_frame_id_ = this->get_parameter("frames.world_frame_id").as_string();
     body_frame_id_ = this->get_parameter("frames.body_frame_id").as_string();
     algo_type_ = this->get_parameter("algorithm_type").as_string();
-    nlos_q_threshold_ = this->get_parameter("NLOS.nlos_q_threshold").as_int();
+    nlos_q_threshold_ = this->get_parameter("NLOS.nlos_q_threshold").as_double();
     // 动态加载基站配置
     // 前置条件：必须在构造函数中开启 automatically_declare_parameters_from_overrides(true)
     // list_parameters 只能列出 YAML 中已存在的参数
