@@ -96,7 +96,7 @@ void UwbLocationNode::load_parameters() {
     body_frame_id_ = this->get_parameter("frames.body_frame_id").as_string();
     algo_type_ = this->get_parameter("algorithm_type").as_string();
     nlos_q_threshold_ = this->get_parameter("NLOS.nlos_q_threshold").as_double();
-    show_raw_uwb_position_ = this->get_parameter("show_raw_uwb_position").as_bool();
+    show_raw_uwb_position_ = this->get_parameter("visualization.show_raw_uwb_position").as_bool();
     show_anchors_ = this->get_parameter("visualization.show_anchors").as_bool();
     // 动态加载基站配置
     // 前置条件：必须在构造函数中开启 automatically_declare_parameters_from_overrides(true)
@@ -226,9 +226,6 @@ void UwbLocationNode::uwb_callback(const uwb_imu_fusion::msg::UWB::SharedPtr msg
             [[fallthrough]];
 
         case SysState::STATIC_INIT:
-            if(show_raw_uwb_position_) {
-                // 这里调用你实现的函数
-            }
             // 收集 UWB 数据用于初始化
             for (size_t i = 0; i < msg->anchor_ids.size() && i < msg->dists.size() && i < msg->q_values.size(); ++i) {
                 int anchor_id = msg->anchor_ids[i];
