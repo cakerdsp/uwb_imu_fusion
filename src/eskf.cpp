@@ -139,7 +139,7 @@ void ESKF::update(const UwbMeasurement& uwb) {
     // 重力对位置没有直接观测导数，所以 H 其他部分都是 0
     // 重力是通过 P 矩阵里的相关性 (off-diagonal terms) 间接更新的
 
-    R_uwb_ = std::pow(config_.uwb_noise_std, 2) * (1 + (uwb.q_value - 3 > 0 ? uwb.q_value - 3 : 0)); // 根据 q 值调整观测噪声
+    R_uwb_ = std::pow(config_.uwb_noise_std, 2) * (1 + (uwb.q_value - 5 > 0 ? uwb.q_value - 5 : 0)); // 根据 q 值调整观测噪声
     double S = (H * P_ * H.transpose())(0, 0) + R_uwb_;
 
     Eigen::VectorXd K = P_ * H.transpose() / S; // (15x1)
