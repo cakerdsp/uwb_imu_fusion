@@ -223,6 +223,8 @@ void UwbLocationNode::uwb_callback(const uwb_imu_fusion::msg::UWB::SharedPtr msg
                 if (anchors_.find(anchor_id) == anchors_.end()) continue;
                 
                 UwbMeasurement meas;
+                meas.timestamp = current_ts;
+                meas.anchor_id = anchor_id;
                 meas.anchor_pos = anchors_[anchor_id];
                 meas.dist = msg->dists[i];
                 meas.q_value = msg->q_values[i];
