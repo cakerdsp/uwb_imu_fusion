@@ -67,19 +67,23 @@ UwbLocationNode::UwbLocationNode(const rclcpp::NodeOptions& options)
 }
 
 void UwbLocationNode::load_parameters() {
-    // 声明并获取静态参数
-    this->declare_parameter("topics.imu_sub", "/imu/data");
-    this->declare_parameter("topics.uwb_sub", "/uwb/data");
-    this->declare_parameter("topics.odom_pub", "/odometry/filtered");
-    this->declare_parameter("frames.world_frame_id", "map");
-    this->declare_parameter("frames.body_frame_id", "base_link");
-    this->declare_parameter("algorithm_type", "Dummy");
-    this->declare_parameter("NLOS.nlos_q_threshold", 6.0);
-    this->declare_parameter("eskf.acc_noise_std", 0.1);
-    this->declare_parameter("eskf.gyro_noise_std", 0.05);
-    this->declare_parameter("eskf.acc_bias_walk_std", 1e-4);
-    this->declare_parameter("eskf.gyro_bias_walk_std", 1e-5);
-    this->declare_parameter("eskf.uwb_noise_std", 0.15);
+    auto declare_param = [this](const std::string& name, auto default_val) {
+        if (!this->has_parameter(name)) {
+            this->declare_parameter(name, default_val);
+        }
+    };
+    declare_param("topics.imu_sub", "/imu/data");
+    declare_param("topics.uwb_sub", "/uwb/data");
+    declare_param("topics.odom_pub", "/odometry/filtered");
+    declare_param("frames.world_frame_id", "map");
+    declare_param("frames.body_frame_id", "base_link");
+    declare_param("algorithm_type", "Dummy");
+    declare_param("NLOS.nlos_q_threshold", 6.0);
+    declare_param("eskf.acc_noise_std", 0.1);
+    declare_param("eskf.gyro_noise_std", 0.05);
+    declare_param("eskf.acc_bias_walk_std", 1e-4);
+    declare_param("eskf.gyro_bias_walk_std", 1e-5);
+    declare_param("eskf.uwb_noise_std", 0.15);
 
     world_frame_id_ = this->get_parameter("frames.world_frame_id").as_string();
     body_frame_id_ = this->get_parameter("frames.body_frame_id").as_string();

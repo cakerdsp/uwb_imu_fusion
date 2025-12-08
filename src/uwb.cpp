@@ -9,12 +9,15 @@ class UwbDriverNode : public rclcpp::Node {
 public:
     UwbDriverNode(const rclcpp::NodeOptions& options) 
         : Node("uwb_pub_node", rclcpp::NodeOptions(options).automatically_declare_parameters_from_overrides(true)) {
-        
-        // 1. 声明参数（如果配置文件中没有，使用默认值）
-        this->declare_parameter("port_name", "/dev/ttyUSB0");
-        this->declare_parameter("baud_rate", 115200);
-        this->declare_parameter("frame_id", "uwb_link");
-        this->declare_parameter("topics.uwb_pub", "/uwb/data");
+        auto declare_param = [this](const std::string& name, auto default_val) {
+            if (!this->has_parameter(name)) {
+                this->declare_parameter(name, default_val);
+            }
+        };
+        declare_param("port_name", "/dev/ttyUSB0");
+        declare_param("baud_rate", 115200);
+        declare_param("frame_id", "uwb_link");
+        declare_param("topics.uwb_pub", "/uwb/data");
 
         std::string port = this->get_parameter("port_name").as_string();
         int baud = this->get_parameter("baud_rate").as_int();
