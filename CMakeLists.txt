@@ -34,7 +34,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 # 在Linux上使用libserial，在Windows上可能需要使用其他库
 if(UNIX AND NOT APPLE)
   find_package(PkgConfig REQUIRED)
-  pkg_check_modules(LIBSERIAL REQUIRED libserial)
+  # pkg_check_modules(LIBSERIAL REQUIRED libserial)
   set(HAVE_LIBSERIAL TRUE)
 else()
   # Windows或其他平台，可能需要使用其他串口库
@@ -98,34 +98,34 @@ target_include_directories(${PROJECT_NAME}_node PUBLIC
 )
 
 # 可执行文件：UWB驱动节点
-add_executable(uwb_driver_node src/uwb.cpp src/serial_reader.cpp)
+add_executable(uwb_pub_node src/uwb.cpp src/serial_reader.cpp)
 
 # 链接库
-ament_target_dependencies(uwb_driver_node
+ament_target_dependencies(uwb_pub_node
   rclcpp
   geometry_msgs
 )
 
 # 链接自定义消息
-rosidl_target_interfaces(uwb_driver_node
+rosidl_target_interfaces(uwb_pub_node
   ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 if(HAVE_LIBSERIAL)
-  target_link_libraries(uwb_driver_node
+  target_link_libraries(uwb_pub_node
     ${LIBSERIAL_LIBRARIES}
   )
-  target_include_directories(uwb_driver_node PUBLIC
+  target_include_directories(uwb_pub_node PUBLIC
     ${LIBSERIAL_INCLUDE_DIRS}
   )
 endif()
 
-target_include_directories(uwb_driver_node PUBLIC
+target_include_directories(uwb_pub_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
 
 # 安装可执行文件
-install(TARGETS ${PROJECT_NAME}_node uwb_driver_node
+install(TARGETS ${PROJECT_NAME}_node uwb_pub_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
