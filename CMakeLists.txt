@@ -24,6 +24,11 @@ find_package(Eigen3 REQUIRED)
 # 或者使用ament_cmake的eigen3_cmake_module
 find_package(eigen3_cmake_module REQUIRED)
 
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/UWB.msg"
+  DEPENDENCIES geometry_msgs std_msgs
+)
+
 # 查找串口库 (Linux)
 # 注意：Windows上可能需要不同的串口库，如Windows Serial Port
 # 在Linux上使用libserial，在Windows上可能需要使用其他库
@@ -68,7 +73,7 @@ set(HEADERS
   include/uwb_location_node.hpp
 )
 
-# 可执行文件
+# 可执行文件：主融合节点
 add_executable(${PROJECT_NAME}_node src/main.cpp ${SOURCES})
 
 # 链接库
@@ -82,11 +87,9 @@ ament_target_dependencies(${PROJECT_NAME}_node
   tf2_geometry_msgs
 )
 
-if(HAVE_LIBSERIAL)
-  target_link_libraries(${PROJECT_NAME}_node
-    ${LIBSERIAL_LIBRARIES}
-  )
-endif()
+# 链接自定义消息
+rosidl_target_interfaces(${PROJECT_NAME}_node
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 target_include_directories(${PROJECT_NAME}_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -94,14 +97,35 @@ target_include_directories(${PROJECT_NAME}_node PUBLIC
   ${EIGEN3_INCLUDE_DIR}
 )
 
+# 可执行文件：UWB驱动节点
+add_executable(uwb_driver_node src/uwb.cpp src/serial_reader.cpp)
+
+# 链接库
+ament_target_dependencies(uwb_driver_node
+  rclcpp
+  geometry_msgs
+)
+
+# 链接自定义消息
+rosidl_target_interfaces(uwb_driver_node
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
 if(HAVE_LIBSERIAL)
-  target_include_directories(${PROJECT_NAME}_node PUBLIC
+  target_link_libraries(uwb_driver_node
+    ${LIBSERIAL_LIBRARIES}
+  )
+  target_include_directories(uwb_driver_node PUBLIC
     ${LIBSERIAL_INCLUDE_DIRS}
   )
 endif()
 
+target_include_directories(uwb_driver_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
 # 安装可执行文件
-install(TARGETS ${PROJECT_NAME}_node
+install(TARGETS ${PROJECT_NAME}_node uwb_driver_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

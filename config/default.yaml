@@ -1,10 +1,18 @@
-Uwb_Location:
+uwb_pub_node:
+  ros__parameters:
+    port_name: "/dev/ttyUSB0"   # UWB 连接的串口端口
+    baud_rate: 115200           # 波特率
+    frame_id: "uwb_link"        # UWB消息的frame_id
+    uwb_pub: "/uwb/data"      # 发布的UWB话题名称
+
+uwb_imu_fusion:
   ros__parameters:
     # ==========================
     # 1. ROS 通信配置
     # ==========================
     topics:
       imu_sub: "/imu/data"        # 订阅：IMU话题名称
+      uwb_sub: "/uwb/data"        # 订阅：UWB话题名称（由uwb_pub_node发布）
       odom_pub: "/odometry/filtered" # 发布：融合后的里程计话题
     
     frames:
@@ -14,10 +22,6 @@ Uwb_Location:
     # ==========================
     # 2. 硬件/串口配置
     # ==========================
-    serial:
-      port_name: "/dev/ttyUSB0"   # UWB 连接的串口端口
-      baud_rate: 115200           # 波特率
-      timeout_ms: 20              # 读取超时时间 (防止串口无数据时程序卡死)
 
     NLOS:
       nlos_q_threshold: 6.0            # NLOS 判定阈值 (根据实际环境调整)

@@ -66,6 +66,7 @@ public:
 // 写的一个空实现，用于测试数据流
 class DummyAlgo : public FusionInterface {
     NavState state_;
+    Config config_;
 public:
     void initialize(const NavState& init_state) override { state_ = init_state; }
     
@@ -77,6 +78,8 @@ public:
         state_.timestamp = uwb.timestamp;
         return true; // 假装更新了
     }
+    
+    void setConfig(const Config& config) override { config_ = config; }
     
     NavState getCurrentState() override { return state_; }
 };

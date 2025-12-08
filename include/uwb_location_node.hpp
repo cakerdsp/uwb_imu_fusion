@@ -5,10 +5,10 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <tf2_ros/transform_broadcaster.h>
 #include <geometry_msgs/msg/transform_stamped.hpp>
+#include "uwb_imu_fusion/msg/uwb.hpp"
 
 #include "uwb_imu_fusion/fusion_interface.hpp" // 包含接口
 #include "uwb_imu_fusion/eskf.hpp"           // 包含实现
-#include "uwb_imu_fusion/serial_reader.hpp"
 
 namespace uwb_imu_fusion {
 
@@ -19,10 +19,10 @@ public:
 
 private:
     void load_parameters();
-    void init_hardware();
     
     // 回调函数
     void imu_callback(const sensor_msgs::msg::Imu::SharedPtr msg);
+    void uwb_callback(const uwb_imu_fusion::msg::UWB::SharedPtr msg);
     void timer_callback();
 
     // 发布函数
@@ -50,12 +50,12 @@ private:
 
     // --- ROS 组件 ---
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
+    rclcpp::Subscription<uwb_imu_fusion::msg::UWB>::SharedPtr uwb_sub_;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     // --- 模块 ---
-    SerialReader serial_reader_;
     std::unique_ptr<FusionInterface> fusion_algo_;
 
     // --- 参数 ---
