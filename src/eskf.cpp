@@ -24,14 +24,6 @@ void ESKF::initialize(const NavState& init_state) {
     P_.setIdentity();
     // 同样需要给重力初始方差，否则它不会收敛
     // P_.block<3, 3>(15, 15) *= 0.01; 
-    // Q_ 初始化，此时未放入时间间因子
-    Q_.setZero();
-    Q_.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity() * std::pow(config_.acc_noise_std, 2);
-    Q_.block<3, 3>(3, 3) = Eigen::Matrix3d::Identity() * std::pow(config_.gyro_noise_std, 2);
-    Q_.block<3, 3>(6, 6) = Eigen::Matrix3d::Identity() * std::pow(config_.acc_bias_walk_std, 2);
-    Q_.block<3, 3>(9, 9) = Eigen::Matrix3d::Identity() * std::pow(config_.gyro_bias_walk_std, 2);
-    // R_uwb_ 初始化，此时未放入时间间因子
-    R_uwb_ = std::pow(config_.uwb_noise_std, 2);
     
     initialized_ = true;
     std::cout << "[ESKF] Initialized!" << std::endl;
@@ -116,6 +108,12 @@ void ESKF::predict(const ImuMeasurement& imu) {
     Fi.block<3, 3>(9, 6) = Eigen::Matrix3d::Identity(); // ba noise
     Fi.block<3, 3>(12, 9) = Eigen::Matrix3d::Identity();// bg noise
     // 重力通常建模为常量 (noise=0)，所以 Fi 对应重力的部分为 0
+    // Q_ 初始化，此时未放入时间间因子
+    Q_.setZero();
+    Q_.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity() * std::pow(config_.acc_noise_std, 2);
+    Q_.block<3, 3>(3, 3) = Eigen::Matrix3d::Identity() * std::pow(config_.gyro_noise_std, 2);
+    Q_.block<3, 3>(6, 6) = Eigen::Matrix3d::Identity() * std::pow(config_.acc_bias_walk_std, 2);
+    Q_.block<3, 3>(9, 9) = Eigen::Matrix3d::Identity() * std::pow(config_.gyro_bias_walk_std, 2);
 
     // P 更新
     P_ = Fx * P_ * Fx.transpose() + Fi * (Q_ * dt) * Fi.transpose();
@@ -141,6 +139,7 @@ void ESKF::update(const UwbMeasurement& uwb) {
     // 重力对位置没有直接观测导数，所以 H 其他部分都是 0
     // 重力是通过 P 矩阵里的相关性 (off-diagonal terms) 间接更新的
 
+    R_uwb_ = std::pow(config_.uwb_noise_std, 2) * (1 + (uwb.q_value - 3 > 0 ? uwb.q_value - 3 : 0)); // 根据 q 值调整观测噪声
     double S = (H * P_ * H.transpose())(0, 0) + R_uwb_;
 
     Eigen::VectorXd K = P_ * H.transpose() / S; // (15x1)

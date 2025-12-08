@@ -44,6 +44,7 @@ struct Config {
     double acc_bias_walk_std = 1e-4;
     double gyro_bias_walk_std = 1e-5;
     double uwb_noise_std = 0.15;
+    double nlos_q_threshold = 6;
 };
 
 // 设计的策略模式接口，兼容 ESKF 和 Graph

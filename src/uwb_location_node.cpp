@@ -20,6 +20,7 @@ UwbLocationNode::UwbLocationNode(const rclcpp::NodeOptions& options)
         config.acc_bias_walk_std = this->get_parameter("eskf.acc_bias_walk_std").as_double();
         config.gyro_bias_walk_std = this->get_parameter("eskf.gyro_bias_walk_std").as_double();
         config.uwb_noise_std = this->get_parameter("eskf.uwb_noise_std").as_double();
+        config.nlos_q_threshold = this->get_parameter("NLOS.nlos_q_threshold").as_double();
         fusion_algo_->setConfig(config);
     } else {
         fusion_algo_ = std::make_unique<DummyAlgo>();
