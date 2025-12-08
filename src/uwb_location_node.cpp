@@ -237,8 +237,10 @@ void UwbLocationNode::uwb_callback(const uwb_imu_fusion::msg::UWB::SharedPtr msg
             for (size_t i = 0; i < msg->anchor_ids.size() && i < msg->dists.size() && i < msg->q_values.size(); ++i) {
                 int anchor_id = msg->anchor_ids[i];
                 if (anchors_.find(anchor_id) == anchors_.end()) continue;
-                if (msg->q_values[i] > nlos_q_threshold_) continue; // 质量过滤
-
+                if (msg->q_values[i] > nlos_q_threshold_) {
+                    RCLCPP_WARN(this->get_logger(), "Anchor %d quality is too low. Skipping update.", anchor_id);
+                    continue; // 质量过滤
+                }
                 UwbMeasurement meas;
                 meas.timestamp = current_ts;
                 meas.anchor_id = anchor_id;
