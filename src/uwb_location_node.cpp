@@ -1,5 +1,6 @@
 #include "uwb_location_node.hpp"
-#include "initializer.hpp" // 引入初始化工具
+#include "initializer.hpp"
+#include "trilateration.h"
 
 
 namespace uwb_imu_fusion {
@@ -53,17 +54,21 @@ UwbLocationNode::UwbLocationNode(const rclcpp::NodeOptions& options)
         std::bind(&UwbLocationNode::timer_callback, this));
 
     // 6. 初始化可视化
-    rclcpp::QoS latching_qos(1);
-    latching_qos.transient_local();
-    latching_qos.reliable();
+    if(show_anchors_) {
+        rclcpp::QoS latching_qos(1);
+        latching_qos.transient_local();
+        latching_qos.reliable();
 
-    viz_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
-        "uwb/visualization", latching_qos);
+        viz_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
+            "uwb/visualization", latching_qos);
 
-    // 启动低频定时器 (1Hz 足够了，因为基站是静态的)
-    viz_timer_ = this->create_wall_timer(
-        std::chrono::seconds(1),
-        std::bind(&UwbLocationNode::timer_viz_callback, this));
+        publish_anchors_viz();
+    }
+
+    if(show_raw_uwb_position_) {
+        raw_uwb_pos_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(
+            "uwb/raw_position", 10);
+    }
 }
 
 void UwbLocationNode::load_parameters() {
@@ -84,11 +89,15 @@ void UwbLocationNode::load_parameters() {
     declare_param("eskf.acc_bias_walk_std", 1e-4);
     declare_param("eskf.gyro_bias_walk_std", 1e-5);
     declare_param("eskf.uwb_noise_std", 0.15);
+    declare_param("visualization.show_raw_uwb_position", true);
+    declare_param("visualization.show_anchors", true);
 
     world_frame_id_ = this->get_parameter("frames.world_frame_id").as_string();
     body_frame_id_ = this->get_parameter("frames.body_frame_id").as_string();
     algo_type_ = this->get_parameter("algorithm_type").as_string();
     nlos_q_threshold_ = this->get_parameter("NLOS.nlos_q_threshold").as_double();
+    show_raw_uwb_position_ = this->get_parameter("show_raw_uwb_position").as_bool();
+    show_anchors_ = this->get_parameter("visualization.show_anchors").as_bool();
     // 动态加载基站配置
     // 前置条件：必须在构造函数中开启 automatically_declare_parameters_from_overrides(true)
     // list_parameters 只能列出 YAML 中已存在的参数
@@ -217,6 +226,9 @@ void UwbLocationNode::uwb_callback(const uwb_imu_fusion::msg::UWB::SharedPtr msg
             [[fallthrough]];
 
         case SysState::STATIC_INIT:
+            if(show_raw_uwb_position_) {
+                // 这里调用你实现的函数
+            }
             // 收集 UWB 数据用于初始化
             for (size_t i = 0; i < msg->anchor_ids.size() && i < msg->dists.size() && i < msg->q_values.size(); ++i) {
                 int anchor_id = msg->anchor_ids[i];
@@ -233,6 +245,9 @@ void UwbLocationNode::uwb_callback(const uwb_imu_fusion::msg::UWB::SharedPtr msg
             break;
 
         case SysState::RUNNING_FUSION:
+            if(show_raw_uwb_position_) {
+                publish_raw_uwb_position(msg);
+            }
             // 处理 UWB 数据 (Update)
             for (size_t i = 0; i < msg->anchor_ids.size() && i < msg->dists.size() && i < msg->q_values.size(); ++i) {
                 int anchor_id = msg->anchor_ids[i];
@@ -391,7 +406,7 @@ void UwbLocationNode::publish_tf(const NavState& state, const rclcpp::Time& stam
 }
 
 
-void UwbLocationNode::timer_viz_callback() {
+void UwbLocationNode::publish_anchors_viz() {
     // 如果没有订阅者，就不消耗 CPU 去构建消息
     if (viz_pub_->get_subscription_count() == 0) {
         return;
@@ -454,5 +469,66 @@ void UwbLocationNode::timer_viz_callback() {
     }
 
     viz_pub_->publish(msg);
+}
+
+void UwbLocationNode::publish_raw_uwb_position(const uwb_imu_fusion::msg::UWB::SharedPtr msg) {
+    vec3d anchorArray[MAX_AHCHOR_NUMBER];
+    int distanceArray[MAX_AHCHOR_NUMBER];
+
+    for(int i = 0; i < MAX_AHCHOR_NUMBER; i++) {
+        distanceArray[i] = 0;
+        anchorArray[i].x = 0;
+        anchorArray[i].y = 0;
+        anchorArray[i].z = 0;
+    }
+
+    int valid_count = 0;
+    for (size_t i = 0; i < msg->anchor_ids.size() && i < msg->dists.size(); ++i) {
+        int anchor_id = msg->anchor_ids[i];
+        if (anchor_id < 0 || anchor_id >= MAX_AHCHOR_NUMBER) continue;
+        if (anchors_.find(anchor_id) == anchors_.end()) continue;
+        if (msg->dists[i] <= 0.0) continue;
+
+        anchorArray[anchor_id].x = anchors_[anchor_id].x();
+        anchorArray[anchor_id].y = anchors_[anchor_id].y();
+        anchorArray[anchor_id].z = anchors_[anchor_id].z();
+        distanceArray[anchor_id] = static_cast<int>(msg->dists[i] * 1000.0);
+        valid_count++;
+    }
+
+    if (valid_count < 3) {
+        return;
+    }
+
+    vec3d solution;
+    int result = GetLocation(&solution, anchorArray, distanceArray);
+
+    if (result >= 0) {
+        visualization_msgs::msg::Marker marker;
+        marker.header.frame_id = world_frame_id_;
+        marker.header.stamp = msg->header.stamp;
+        marker.ns = "raw_uwb_position";
+        marker.id = 0;
+        marker.type = visualization_msgs::msg::Marker::SPHERE;
+        marker.action = visualization_msgs::msg::Marker::ADD;
+
+        marker.pose.position.x = solution.x;
+        marker.pose.position.y = solution.y;
+        marker.pose.position.z = solution.z;
+        marker.pose.orientation.w = 1.0;
+
+        marker.scale.x = 0.15;
+        marker.scale.y = 0.15;
+        marker.scale.z = 0.15;
+
+        marker.color.r = 1.0f;
+        marker.color.g = 0.0f;
+        marker.color.b = 0.0f;
+        marker.color.a = 0.8f;
+
+        marker.lifetime = rclcpp::Duration::from_seconds(0.5);
+
+        raw_uwb_pos_pub_->publish(marker);
+    }
 }
 } // namespace uwb_imu_fusion

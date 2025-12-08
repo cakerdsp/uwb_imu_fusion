@@ -7,6 +7,8 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include "uwb_imu_fusion/msg/uwb.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
+#include "visualization_msgs/msg/marker.hpp"
+#include "trilateration.h"
 #include "fusion_interface.hpp" // 包含接口
 #include "eskf.hpp"           // 包含实现
 
@@ -28,6 +30,7 @@ private:
     // 发布函数
     void publish_odometry(const NavState& state, const rclcpp::Time& stamp);
     void publish_tf(const NavState& state, const rclcpp::Time& stamp);
+    void publish_raw_uwb_position(const uwb_imu_fusion::msg::UWB::SharedPtr msg);
 
 private:
     // --- 状态机定义 ---
@@ -64,14 +67,17 @@ private:
     std::string body_frame_id_;
     std::string algo_type_;
     double nlos_q_threshold_;
+    bool show_raw_uwb_position_;
+    bool show_anchors_;
 
 
     // 可视化相关
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr viz_pub_;
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr raw_uwb_pos_pub_;
     rclcpp::TimerBase::SharedPtr viz_timer_;
 
     // 专门用于发布基站的可视化
-    void timer_viz_callback();
+    void publish_anchors_viz();
 };
 
 } // namespace uwb_imu_fusion

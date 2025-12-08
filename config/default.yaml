@@ -28,6 +28,10 @@ uwb_imu_fusion:
 
     algorithm_type: "eskf"  # 可选：eskf / graph
 
+    visualization:
+      show_raw_uwb_position: true
+      show_anchors: true
+
     eskf:
       acc_noise_std: 0.1
       gyro_noise_std: 0.05
