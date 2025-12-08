@@ -299,7 +299,7 @@ void UwbLocationNode::timer_callback() {
                 NavState init_state = Initializer::alignIMU(init_imu_buf_);
                 
                 // 2. 算出初始位置 (调用你的三边定位库)
-                init_state.p = Initializer::solveTrilateration(init_uwb_buf_);
+                init_state.p = Initializer::solveTrilateration(init_uwb_buf_, this->get_logger());
                 
                 // 3. 补上时间戳
                 init_state.timestamp = current_ros_time.seconds();

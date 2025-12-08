@@ -1,11 +1,13 @@
 #pragma once
 #include "fusion_interface.hpp"
 #include "trilateration.h"
+#include <rclcpp/rclcpp.hpp>
 #include <vector>
 #include <numeric>
 #include <cmath>
 #include <Eigen/Dense>
 #include <iostream>
+#include <map>
 
 namespace uwb_imu_fusion {
 
@@ -61,8 +63,14 @@ public:
     }
 
     // 2. UWB 初始位置解算 (你的库接口预留)
-    static Eigen::Vector3d solveTrilateration(const std::vector<UwbMeasurement>& uwb_buffer) {
-        if (uwb_buffer.empty()) return Eigen::Vector3d::Zero();
+    static Eigen::Vector3d solveTrilateration(const std::vector<UwbMeasurement>& uwb_buffer, rclcpp::Logger logger) {
+        if (uwb_buffer.empty()) {
+            RCLCPP_WARN(logger, "[Initializer] UWB buffer is empty, cannot solve trilateration.");
+            return Eigen::Vector3d::Zero();
+        }
+        
+        RCLCPP_INFO(logger, "[Initializer] Starting trilateration with %zu UWB measurements.", uwb_buffer.size());
+        
         // --- 第一步：数据清洗与平均 ---
         // 既然是初始化，我们希望利用 buffer 里的多帧数据来降噪
         // 使用 map 累加每个基站的距离： <anchor_id, {总距离, 计数}>
@@ -70,10 +78,20 @@ public:
         // 记录基站坐标： <anchor_id, 坐标>
         std::map<int, Eigen::Vector3d> anchor_positions;
 
+        int filtered_count = 0;
+        int invalid_id_count = 0;
+        int invalid_dist_count = 0;
+
         for (const auto& meas : uwb_buffer) {
             // 过滤无效数据
-            if (meas.anchor_id < 0 || meas.anchor_id >= MAX_AHCHOR_NUMBER) continue;
-            if (meas.dist <= 0.0) continue;
+            if (meas.anchor_id < 0 || meas.anchor_id >= MAX_AHCHOR_NUMBER) {
+                invalid_id_count++;
+                continue;
+            }
+            if (meas.dist <= 0.0) {
+                invalid_dist_count++;
+                continue;
+            }
 
             dist_sums[meas.anchor_id].first += meas.dist;
             dist_sums[meas.anchor_id].second++;
@@ -82,7 +100,13 @@ public:
             if (anchor_positions.find(meas.anchor_id) == anchor_positions.end()) {
                 anchor_positions[meas.anchor_id] = meas.anchor_pos;
             }
+            
+            filtered_count++;
         }
+        
+        RCLCPP_INFO(logger, "[Initializer] Filtered measurements: valid=%d, invalid_id=%d, invalid_dist=%d", 
+                    filtered_count, invalid_id_count, invalid_dist_count);
+        RCLCPP_INFO(logger, "[Initializer] Found %zu unique anchor IDs in buffer.", dist_sums.size());
 
         // --- 第二步：填充旧库所需的数据结构 ---
         // 准备旧库需要的定长数组
@@ -105,7 +129,10 @@ public:
             double sum = kv.second.first;
             int count = kv.second.second;
 
-            if (count == 0) continue;
+            if (count == 0) {
+                RCLCPP_WARN(logger, "[Initializer] Anchor ID %d has zero count, skipping.", id);
+                continue;
+            }
 
             // 计算平均距离 (米)
             double avg_dist_m = sum / count;
@@ -119,13 +146,21 @@ public:
                 anchorArray[id].y = anchor_positions[id].y();
                 anchorArray[id].z = anchor_positions[id].z();
                 valid_anchors_count++;
+                RCLCPP_INFO(logger, "[Initializer] Anchor ID %d: pos=[%.3f, %.3f, %.3f], dist=%.3f m (avg from %d measurements)", 
+                           id, anchor_positions[id].x(), anchor_positions[id].y(), anchor_positions[id].z(), 
+                           avg_dist_m, count);
+            } else {
+                RCLCPP_WARN(logger, "[Initializer] Anchor ID %d found in dist_sums but missing in anchor_positions.", id);
             }
         }
 
+        RCLCPP_INFO(logger, "[Initializer] Total valid anchors prepared: %d", valid_anchors_count);
+
         // 检查有效基站数量，少于3个无法定位
         if (valid_anchors_count < 3) {
-            std::cerr << "[Initializer] Not enough anchors for trilateration. Count: " 
-                      << valid_anchors_count << std::endl;
+            RCLCPP_WARN(logger, "[Initializer] Not enough anchors for trilateration. Count: %d (required: 3)", valid_anchors_count);
+            RCLCPP_INFO(logger, "[Initializer] Debug info: dist_sums size=%zu, anchor_positions size=%zu", 
+                        dist_sums.size(), anchor_positions.size());
             return Eigen::Vector3d::Zero();
         }
 
@@ -136,10 +171,12 @@ public:
         // --- 第四步：结果转换与返回 ---
         if (result >= 0) {
             // 解算成功
+            RCLCPP_INFO(logger, "[Initializer] Trilateration succeeded. Position: [%.3f, %.3f, %.3f]", 
+                       best_solution.x, best_solution.y, best_solution.z);
             return Eigen::Vector3d(best_solution.x, best_solution.y, best_solution.z);
         } else {
             // 解算失败 (错误码见 trilateration.cpp 定义)
-            std::cerr << "[Initializer] Trilateration failed with error code: " << result << std::endl;
+            RCLCPP_ERROR(logger, "[Initializer] Trilateration failed with error code: %d", result);
             // 失败时返回零向量，或者可以考虑返回 Buffer 中所有基站坐标的中心点作为保底
             return Eigen::Vector3d::Zero();
         }
