@@ -62,7 +62,7 @@ void ESKF::addImuData(const ImuMeasurement& imu) {
     std::cout << "Acc Variance: " << acc_variance << ", Gyro Norm: " << imu.gyro.norm() << std::endl;
     bool is_static = (acc_variance >= 0.0 && 
                       acc_variance < config_.ZUPT_acc_limit && 
-                      gyro_norm < config_.ZIHR_limit && state_.v.norm() < config_.ZUPT_velocity_limit);
+                      gyro_norm < config_.ZIHR_limit);
     if(is_static) {
         updateZUPT();
         if(!last_is_stationary_) {
