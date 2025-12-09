@@ -3,6 +3,8 @@
 #include "fusion_interface.hpp"
 #include <Eigen/Dense>
 #include <iostream>
+#include <deque>
+#include <numeric>
 
 namespace uwb_imu_fusion {
 
@@ -28,6 +30,9 @@ private:
     bool initialized_ = false;
     double last_imu_time_ = 0.0;
     double static_yaw_ref_ = 0.0;
+    bool last_is_stationary_ = false;
+    std::deque<double> acc_buffer_;
+    const int ACC_BUFFER_SIZE = 20;
 
     NavState state_;
 

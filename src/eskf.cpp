@@ -42,15 +42,34 @@ void ESKF::addImuData(const ImuMeasurement& imu) {
     }
     predict(imu);
     last_imu_time_ = imu.timestamp;
+
     // 零速修正和航向修正
-    double acc_norm = imu.acc.norm();
+    double curr_acc_norm = imu.acc.norm();
+    acc_buffer_.push_back(curr_acc_norm);
+    if (acc_buffer_.size() > ACC_BUFFER_SIZE) {
+        acc_buffer_.pop_front();
+    }
+    double acc_variance = -1.0;
+    if (acc_buffer_.size() >= ACC_BUFFER_SIZE) {
+        double mean = std::accumulate(acc_buffer_.begin(), acc_buffer_.end(), 0.0) / acc_buffer_.size();
+        double sq_sum = 0.0;
+        for(double it : acc_buffer_) {
+            sq_sum += (it - mean) * (it - mean);
+        }
+        acc_variance = sq_sum / acc_buffer_.size();
+    }
     double gyro_norm = imu.gyro.norm();
-    if(gyro_norm < config_.ZIHR_limit) {
+    bool is_static = (acc_variance >= 0.0 && 
+                      acc_variance < config_.ZUPT_limit && 
+                      gyro_norm < config_.ZIHR_limit);
+    if(is_static) {
+        updateZUPT();
+        if(!last_is_stationary_) {
+            static_yaw_ref_ = getYaw(state_.q);
+        }
         updateZIHR();
     }
-    if(std::abs(acc_norm - 9.81) < config_.ZUPT_limit) {
-        updateZUPT();
-    }
+    last_is_stationary_ = is_static;
 }
 
 bool ESKF::addUwbData(const UwbMeasurement& uwb) {
@@ -64,7 +83,7 @@ bool ESKF::addUwbData(const UwbMeasurement& uwb) {
 // Predict: 15维
 // --------------------------------------------------------------------------------
 void ESKF::predict(const ImuMeasurement& imu) {
-    static_yaw_ref_ = getYaw(state_.q);
+    // static_yaw_ref_ = getYaw(state_.q);
     double dt = imu.timestamp - last_imu_time_;
     double dt2 = dt * dt;
 
