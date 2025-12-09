@@ -1,5 +1,12 @@
 #include "eskf.hpp"
 #include <cmath>
+#include <iomanip>
+#include <filesystem>
+#include <chrono>
+#include <sstream>
+#include <cstdlib>
+#include <iomanip>
+#include <filesystem>
 
 namespace uwb_imu_fusion {
 
@@ -13,7 +20,35 @@ inline Eigen::Matrix3d skew(const Eigen::Vector3d& v) {
 }
 
 ESKF::ESKF() {
+    const char* home_env = std::getenv("HOME");
+    std::string home_dir = home_env ? home_env : ".";
+    std::string log_dir = home_dir + "/.ros/zupt_logs";
+    
+    try {
+        if (!std::filesystem::exists(log_dir)) {
+            std::filesystem::create_directories(log_dir);
+        }
+        
+        auto now = std::chrono::system_clock::now();
+        auto time_t = std::chrono::system_clock::to_time_t(now);
+        std::stringstream ss;
+        ss << log_dir << "/zupt_data_" << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S") << ".csv";
+        
+        zupt_log_file_.open(ss.str(), std::ios::out);
+        if (zupt_log_file_.is_open()) {
+            log_enabled_ = true;
+            zupt_log_file_ << "timestamp,acc_variance,gyro_norm,vel_norm\n";
+            zupt_log_file_.flush();
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "[ESKF] Failed to create log file: " << e.what() << std::endl;
+    }
+}
 
+ESKF::~ESKF() {
+    if (zupt_log_file_.is_open()) {
+        zupt_log_file_.close();
+    }
 }
 
 void ESKF::initialize(const NavState& init_state) {
@@ -59,11 +94,17 @@ void ESKF::addImuData(const ImuMeasurement& imu) {
         acc_variance = sq_sum / acc_buffer_.size();
     }
     double gyro_norm = imu.gyro.norm();
-    info_count_++;
-    // if(info_count_ >= INFO_PRINT_INTERVAL) {
-    //     std::cout << "Acc Variance: " << acc_variance << ", Gyro Norm: " << imu.gyro.norm() << std::endl;
-    //     info_count_ = 0;
-    // }
+    double vel_norm = state_.v.norm();
+    
+    if (log_enabled_ && zupt_log_file_.is_open()) {
+        zupt_log_file_ << std::fixed << std::setprecision(9) 
+                       << imu.timestamp << ","
+                       << acc_variance << ","
+                       << gyro_norm << ","
+                       << vel_norm << "\n";
+        zupt_log_file_.flush();
+    }
+    
     bool is_static = (acc_variance >= 0.0 && 
                       acc_variance < config_.ZUPT_acc_limit && 
                       gyro_norm < config_.ZIHR_limit);

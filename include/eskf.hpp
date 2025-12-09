@@ -5,13 +5,15 @@
 #include <iostream>
 #include <deque>
 #include <numeric>
+#include <fstream>
+#include <string>
 
 namespace uwb_imu_fusion {
 
 class ESKF : public FusionInterface {
 public:
     ESKF();
-    ~ESKF() = default;
+    ~ESKF();
 
     void initialize(const NavState& init_state) override;
     void addImuData(const ImuMeasurement& imu) override;
@@ -48,6 +50,9 @@ private:
     double R_uwb_;
 
     Config config_;
+    
+    std::ofstream zupt_log_file_;
+    bool log_enabled_ = false;
 };
 
 } // namespace uwb_imu_fusion
