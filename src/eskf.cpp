@@ -249,6 +249,20 @@ void ESKF::updateZUPT() {
     state_.q = (state_.q * dq.normalized()).normalized();
 
     // 修正加速度计零偏 (Acc Bias) -> 这是 ZUPT 的主要副产品
+    Eigen::Vector3d delta_ba = delta_x.segment<3>(9);
+    if (delta_ba.norm() > config_.acc_bias_limit) {
+        // 如果模长超过限制，就按比例缩小 (保留方向)
+        // 缩放系数 = 限幅值 / 当前模长
+        delta_x.segment<3>(9) *= (config_.acc_bias_limit / delta_ba.norm());
+        
+        // 可选：打印日志，看看是不是经常触发
+        // std::cout << "Accel Bias update clipped!" << std::endl;
+    }
+    Eigen::Vector3d delta_bg = delta_x.segment<3>(12);
+    if (delta_bg.norm() > config_.gyro_bias_limit) {
+        delta_x.segment<3>(12) *= (config_.gyro_bias_limit / delta_bg.norm());
+        // std::cout << "Gyro Bias update clipped!" << std::endl;
+    }
     state_.ba += delta_x.segment<3>(9);
     state_.bg += delta_x.segment<3>(12);
 
@@ -299,6 +313,20 @@ void ESKF::updateZIHR() {
     state_.q = (state_.q * dq.normalized()).normalized();
 
     // 修正陀螺仪零偏 (Gyro Bias) -> 这是 ZIHR 的主要副产品
+    Eigen::Vector3d delta_ba = delta_x.segment<3>(9);
+    if (delta_ba.norm() > config_.acc_bias_limit) {
+        // 如果模长超过限制，就按比例缩小 (保留方向)
+        // 缩放系数 = 限幅值 / 当前模长
+        delta_x.segment<3>(9) *= (config_.acc_bias_limit / delta_ba.norm());
+        
+        // 可选：打印日志，看看是不是经常触发
+        // std::cout << "Accel Bias update clipped!" << std::endl;
+    }
+    Eigen::Vector3d delta_bg = delta_x.segment<3>(12);
+    if (delta_bg.norm() > config_.gyro_bias_limit) {
+        delta_x.segment<3>(12) *= (config_.gyro_bias_limit / delta_bg.norm());
+        // std::cout << "Gyro Bias update clipped!" << std::endl;
+    }
     state_.ba += delta_x.segment<3>(9);
     state_.bg += delta_x.segment<3>(12);
 
