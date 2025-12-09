@@ -38,6 +38,12 @@ uwb_imu_fusion:
       acc_bias_walk_std: 0.01
       gyro_bias_walk_std: 0.01
       uwb_noise_std: 0.15
+      # 【新增】Bias 限幅阈值
+      acc_bias_limit: 0.1        # 加速度计偏置限幅，单位：m/s²
+      gyro_bias_limit: 0.1       # 陀螺仪偏置 限幅，单位：rad/s
+      ZUPT_limit: 0.05           # 速度限幅，单位：m/s
+      ZIHR_limit: 0.01          # 角速度限幅，单位：rad
+
 
     # ==========================
     # 3. 基站 (Anchors) 配置

@@ -20,10 +20,14 @@ public:
 private:
     void predict(const ImuMeasurement& imu);
     void update(const UwbMeasurement& uwb);
+    void updateZUPT(); // 零速修正 (Zero Velocity Update)
+    void updateZIHR(); // 零积分航向 (Zero Integrated Heading Rate)
+    double getYaw(const Eigen::Quaterniond& q);
 
 private:
     bool initialized_ = false;
     double last_imu_time_ = 0.0;
+    double static_yaw_ref_ = 0.0;
 
     NavState state_;
 

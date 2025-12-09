@@ -42,6 +42,15 @@ void ESKF::addImuData(const ImuMeasurement& imu) {
     }
     predict(imu);
     last_imu_time_ = imu.timestamp;
+    // 零速修正和航向修正
+    double acc_norm = imu.acc.norm();
+    double gyro_norm = imu.gyro.norm();
+    if(gyro_norm < config_.ZIHR_limit) {
+        updateZIHR();
+    }
+    if(std::abs(acc_norm - 9.81) < config_.ZUPT_limit) {
+        updateZUPT();
+    }
 }
 
 bool ESKF::addUwbData(const UwbMeasurement& uwb) {
@@ -55,6 +64,7 @@ bool ESKF::addUwbData(const UwbMeasurement& uwb) {
 // Predict: 15维
 // --------------------------------------------------------------------------------
 void ESKF::predict(const ImuMeasurement& imu) {
+    static_yaw_ref_ = getYaw(state_.q);
     double dt = imu.timestamp - last_imu_time_;
     double dt2 = dt * dt;
 
@@ -152,6 +162,22 @@ void ESKF::update(const UwbMeasurement& uwb) {
     P_ = I_KH * P_ * I_KH.transpose();
     P_ += (K * K.transpose()) * R_uwb_;
 
+    // 防御性编程，人为修正偏差
+    // 对于IMU偏置，不会改变的过于离谱
+    Eigen::Vector3d delta_ba = delta_x.segment<3>(9);
+    if (delta_ba.norm() > config_.acc_bias_limit) {
+        // 如果模长超过限制，就按比例缩小 (保留方向)
+        // 缩放系数 = 限幅值 / 当前模长
+        delta_x.segment<3>(9) *= (config_.acc_bias_limit / delta_ba.norm());
+        
+        // 可选：打印日志，看看是不是经常触发
+        // std::cout << "Accel Bias update clipped!" << std::endl;
+    }
+    Eigen::Vector3d delta_bg = delta_x.segment<3>(12);
+    if (delta_bg.norm() > config_.gyro_bias_limit) {
+        delta_x.segment<3>(12) *= (config_.gyro_bias_limit / delta_bg.norm());
+        // std::cout << "Gyro Bias update clipped!" << std::endl;
+    }
     // --- 注入误差 ---
     state_.p += delta_x.segment<3>(0);
     state_.v += delta_x.segment<3>(3);
@@ -171,4 +197,96 @@ void ESKF::setConfig(const Config& config) {
     config_ = config;
 }
 
+void ESKF::updateZUPT() {
+    // 1. 观测维度 = 3 (vx, vy, vz)
+    Eigen::Vector3d residual = -state_.v; // 期望速度 0，实际 state_.v
+
+    // 2. H 矩阵 (3x15)
+    // 速度误差位于状态向量索引 3~5
+    Eigen::Matrix<double, 3, 15> H = Eigen::Matrix<double, 3, 15>::Zero();
+    H.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity();
+
+    // 3. R 矩阵 (3x3)
+    // 这是一个强约束，给极小的噪声
+    Eigen::Matrix3d R = Eigen::Matrix3d::Identity() * 1e-4;
+
+    // 4. EKF 更新
+    Eigen::Matrix<double, 3, 3> S = H * P_ * H.transpose() + R;
+    Eigen::Matrix<double, 15, 3> K = P_ * H.transpose() * S.inverse();
+    Eigen::VectorXd delta_x = K * residual;
+
+    // 更新 P
+    Eigen::Matrix<double, 15, 15> I = Eigen::Matrix<double, 15, 15>::Identity();
+    P_ = (I - K * H) * P_;
+
+    // 5. 注入误差
+    state_.p += delta_x.segment<3>(0);
+    state_.v += delta_x.segment<3>(3);
+    
+    // 姿态也可能被微调 (因为速度误差可能来源于姿态倾斜)
+    Eigen::Vector3d delta_theta = delta_x.segment<3>(6);
+    Eigen::Quaterniond dq(1, 0.5 * delta_theta.x(), 0.5 * delta_theta.y(), 0.5 * delta_theta.z());
+    state_.q = (state_.q * dq.normalized()).normalized();
+
+    // 修正加速度计零偏 (Acc Bias) -> 这是 ZUPT 的主要副产品
+    state_.ba += delta_x.segment<3>(9);
+    state_.bg += delta_x.segment<3>(12);
+
+    // std::cout << "[ZUPT] Vel corrected." << std::endl;
+}
+
+// ========================================================
+// 2. ZIHR: 航向锁定 (只观测 Yaw)
+// ========================================================
+void ESKF::updateZIHR() {
+    // 1. 观测维度 = 1 (Yaw)
+    double curr_yaw = getYaw(state_.q);
+    double residual_scalar = static_yaw_ref_ - curr_yaw;
+
+    // 角度归一化 (-PI ~ PI)
+    while (residual_scalar > M_PI) residual_scalar -= 2 * M_PI;
+    while (residual_scalar < -M_PI) residual_scalar += 2 * M_PI;
+    
+    Eigen::VectorXd residual(1);
+    residual(0) = residual_scalar;
+
+    // 2. H 矩阵 (1x15)
+    // Yaw 误差位于状态向量索引 8
+    Eigen::Matrix<double, 1, 15> H = Eigen::Matrix<double, 1, 15>::Zero();
+    H(0, 8) = 1.0;
+
+    // 3. R 矩阵 (1x1)
+    Eigen::Matrix<double, 1, 1> R;
+    R(0, 0) = 1e-5; // 强约束
+
+    // 4. EKF 更新
+    // 注意这里 S 是标量，求逆就是取倒数，计算极快
+    Eigen::Matrix<double, 1, 1> S = H * P_ * H.transpose() + R;
+    Eigen::Matrix<double, 15, 1> K = P_ * H.transpose() * S.inverse();
+    Eigen::VectorXd delta_x = K * residual;
+
+    // 更新 P
+    Eigen::Matrix<double, 15, 15> I = Eigen::Matrix<double, 15, 15>::Identity();
+    P_ = (I - K * H) * P_;
+
+    // 5. 注入误差
+    state_.p += delta_x.segment<3>(0);
+    state_.v += delta_x.segment<3>(3);
+    
+    // 姿态修正 (重点修 Yaw)
+    Eigen::Vector3d delta_theta = delta_x.segment<3>(6);
+    Eigen::Quaterniond dq(1, 0.5 * delta_theta.x(), 0.5 * delta_theta.y(), 0.5 * delta_theta.z());
+    state_.q = (state_.q * dq.normalized()).normalized();
+
+    // 修正陀螺仪零偏 (Gyro Bias) -> 这是 ZIHR 的主要副产品
+    state_.ba += delta_x.segment<3>(9);
+    state_.bg += delta_x.segment<3>(12);
+
+    // std::cout << "[ZIHR] Yaw locked." << std::endl;
+}
+
+double ESKF::getYaw(const Eigen::Quaterniond& q) {
+    return std::atan2(2.0 * (q.w() * q.z() + q.x() * q.y()), 
+                      1.0 - 2.0 * (q.y() * q.y() + q.z() * q.z()));
+}
 } // namespace uwb_imu_fusion

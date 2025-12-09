@@ -23,6 +23,10 @@ UwbLocationNode::UwbLocationNode(const rclcpp::NodeOptions& options)
         config.gyro_bias_walk_std = this->get_parameter("eskf.gyro_bias_walk_std").as_double();
         config.uwb_noise_std = this->get_parameter("eskf.uwb_noise_std").as_double();
         config.nlos_q_threshold = this->get_parameter("NLOS.nlos_q_threshold").as_double();
+        config.acc_bias_limit = this->get_parameter("eskf.acc_bias_limit").as_double();
+        config.gyro_bias_limit = this->get_parameter("eskf.gyro_bias_limit").as_double();
+        config.ZUPT_limit = this->get_parameter("eskf.ZUPT_limit").as_double();
+        config.ZIHR_limit = this->get_parameter("eskf.ZIHR_limit").as_double();
         fusion_algo_->setConfig(config);
     } else {
         fusion_algo_ = std::make_unique<DummyAlgo>();
@@ -93,6 +97,10 @@ void UwbLocationNode::load_parameters() {
     declare_param("eskf.uwb_noise_std", 0.15);
     declare_param("visualization.show_raw_uwb_position", true);
     declare_param("visualization.show_anchors", true);
+    declare_param("eskf.acc_bias_limit", 0.1);
+    declare_param("eskf.gyro_bias_limit", 0.1);
+    declare_param("eskf.ZUPT_limit", 0.05);
+    declare_param("eskf.ZIHR_limit", 0.01);
 
     world_frame_id_ = this->get_parameter("frames.world_frame_id").as_string();
     body_frame_id_ = this->get_parameter("frames.body_frame_id").as_string();

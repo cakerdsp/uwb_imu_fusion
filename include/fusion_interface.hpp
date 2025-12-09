@@ -45,6 +45,11 @@ struct Config {
     double gyro_bias_walk_std = 1e-5;
     double uwb_noise_std = 0.15;
     double nlos_q_threshold = 6;
+    double acc_bias_limit = 0.1;
+    double gyro_bias_limit = 0.1;
+    // 【新增】Bias 限幅阈值
+    double ZUPT_limit = 0.05; // 例如 0.05 m/s^2
+    double ZIHR_limit = 0.01; // 例如 0.01 rad/s
 };
 
 // 设计的策略模式接口，兼容 ESKF 和 Graph
