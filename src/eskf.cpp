@@ -6,8 +6,6 @@
 #include <sstream>
 #include <cstdlib>
 #include <ament_index_cpp/get_package_share_directory.hpp>
-#include <iomanip>
-#include <filesystem>
 
 namespace uwb_imu_fusion {
 
@@ -22,10 +20,47 @@ inline Eigen::Matrix3d skew(const Eigen::Vector3d& v) {
 
 ESKF::ESKF() {
     std::string log_dir;
-    try {
-        log_dir = ament_index_cpp::get_package_share_directory("uwb_imu_fusion") + "/data";
-    } catch (const std::exception& e) {
-        std::cerr << "[ESKF] Failed to locate package share dir: " << e.what() << std::endl;
+    
+    // 尝试多种方式找到项目data目录
+    // 方法1: 尝试从ROS工作空间环境变量获取
+    const char* ros_workspace = std::getenv("COLCON_PREFIX_PATH");
+    if (ros_workspace) {
+        std::string ws_path = std::string(ros_workspace);
+        size_t pos = ws_path.find("/install");
+        if (pos != std::string::npos) {
+            std::string src_path = ws_path.substr(0, pos) + "/src/uwb_imu_fusion/data";
+            if (std::filesystem::exists(src_path) || std::filesystem::exists(src_path.substr(0, src_path.rfind("/data")))) {
+                log_dir = src_path;
+            }
+        }
+    }
+    
+    // 方法2: 尝试从当前工作目录向上查找package.xml
+    if (log_dir.empty()) {
+        std::filesystem::path current_path = std::filesystem::current_path();
+        std::filesystem::path search_path = current_path;
+        for (int i = 0; i < 10; ++i) {
+            std::filesystem::path package_xml = search_path / "package.xml";
+            if (std::filesystem::exists(package_xml)) {
+                log_dir = (search_path / "data").string();
+                break;
+            }
+            if (search_path == search_path.root_path()) break;
+            search_path = search_path.parent_path();
+        }
+    }
+    
+    // 方法3: 使用ament获取安装目录
+    if (log_dir.empty()) {
+        try {
+            log_dir = ament_index_cpp::get_package_share_directory("uwb_imu_fusion") + "/data";
+        } catch (const std::exception& e) {
+            // 忽略错误，继续尝试其他方法
+        }
+    }
+    
+    // 方法4: 使用HOME目录作为后备
+    if (log_dir.empty()) {
         const char* home_env = std::getenv("HOME");
         std::string home_dir = home_env ? home_env : ".";
         log_dir = home_dir + "/.ros/zupt_logs";
@@ -41,11 +76,15 @@ ESKF::ESKF() {
         std::stringstream ss;
         ss << log_dir << "/zupt_data_" << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S") << ".csv";
         
-        zupt_log_file_.open(ss.str(), std::ios::out);
+        std::string log_file_path = ss.str();
+        zupt_log_file_.open(log_file_path, std::ios::out);
         if (zupt_log_file_.is_open()) {
             log_enabled_ = true;
             zupt_log_file_ << "timestamp,acc_variance,gyro_norm,vel_norm\n";
             zupt_log_file_.flush();
+            std::cout << "[ESKF] Log file created: " << log_file_path << std::endl;
+        } else {
+            std::cerr << "[ESKF] Failed to open log file: " << log_file_path << std::endl;
         }
     } catch (const std::exception& e) {
         std::cerr << "[ESKF] Failed to create log file: " << e.what() << std::endl;

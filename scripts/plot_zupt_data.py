@@ -15,19 +15,51 @@ matplotlib.rcParams['axes.unicode_minus'] = False
 
 def find_latest_log_file():
     """Find the latest log file"""
+    log_dirs = []
+    
+    # 方法1: 从ROS工作空间环境变量获取
+    ros_workspace = os.getenv("COLCON_PREFIX_PATH")
+    if ros_workspace:
+        ws_path = ros_workspace.split(":")[0] if ":" in ros_workspace else ros_workspace
+        if "/install" in ws_path:
+            src_path = ws_path.split("/install")[0] + "/src/uwb_imu_fusion/data"
+            if os.path.exists(src_path):
+                log_dirs.append(src_path)
+    
+    # 方法2: 从当前工作目录向上查找package.xml
+    current_path = os.getcwd()
+    search_path = current_path
+    for _ in range(10):
+        package_xml = os.path.join(search_path, "package.xml")
+        if os.path.exists(package_xml):
+            data_dir = os.path.join(search_path, "data")
+            if os.path.exists(data_dir):
+                log_dirs.append(data_dir)
+            break
+        parent = os.path.dirname(search_path)
+        if parent == search_path:
+            break
+        search_path = parent
+    
+    # 方法3: 使用HOME目录作为后备
     home_dir = os.path.expanduser("~")
-    log_dir = os.path.join(home_dir, ".ros", "zupt_logs")
+    fallback_dir = os.path.join(home_dir, ".ros", "zupt_logs")
+    if os.path.exists(fallback_dir):
+        log_dirs.append(fallback_dir)
     
-    if not os.path.exists(log_dir):
-        print(f"Log directory not found: {log_dir}")
+    # 查找所有目录中的CSV文件
+    all_csv_files = []
+    for log_dir in log_dirs:
+        csv_files = glob.glob(os.path.join(log_dir, "zupt_data_*.csv"))
+        all_csv_files.extend(csv_files)
+    
+    if not all_csv_files:
+        print("No log files found. Searched in:")
+        for log_dir in log_dirs:
+            print(f"  - {log_dir}")
         return None
     
-    csv_files = glob.glob(os.path.join(log_dir, "zupt_data_*.csv"))
-    if not csv_files:
-        print(f"No log files found in: {log_dir}")
-        return None
-    
-    latest_file = max(csv_files, key=os.path.getmtime)
+    latest_file = max(all_csv_files, key=os.path.getmtime)
     return latest_file
 
 def plot_zupt_data(csv_file):
