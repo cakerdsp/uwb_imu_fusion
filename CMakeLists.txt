@@ -19,6 +19,7 @@ find_package(visualization_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 
 # 查找Eigen3
 find_package(Eigen3 REQUIRED)
@@ -87,6 +88,7 @@ ament_target_dependencies(${PROJECT_NAME}_node
   tf2_ros
   tf2
   tf2_geometry_msgs
+  ament_index_cpp
 )
 
 # 链接自定义消息

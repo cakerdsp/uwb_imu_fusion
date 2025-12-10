@@ -5,6 +5,7 @@
 #include <chrono>
 #include <sstream>
 #include <cstdlib>
+#include <ament_index_cpp/get_package_share_directory.hpp>
 #include <iomanip>
 #include <filesystem>
 
@@ -20,9 +21,15 @@ inline Eigen::Matrix3d skew(const Eigen::Vector3d& v) {
 }
 
 ESKF::ESKF() {
-    const char* home_env = std::getenv("HOME");
-    std::string home_dir = home_env ? home_env : ".";
-    std::string log_dir = home_dir + "/.ros/zupt_logs";
+    std::string log_dir;
+    try {
+        log_dir = ament_index_cpp::get_package_share_directory("uwb_imu_fusion") + "/data";
+    } catch (const std::exception& e) {
+        std::cerr << "[ESKF] Failed to locate package share dir: " << e.what() << std::endl;
+        const char* home_env = std::getenv("HOME");
+        std::string home_dir = home_env ? home_env : ".";
+        log_dir = home_dir + "/.ros/zupt_logs";
+    }
     
     try {
         if (!std::filesystem::exists(log_dir)) {
@@ -84,7 +91,7 @@ void ESKF::addImuData(const ImuMeasurement& imu) {
     if (acc_buffer_.size() > ACC_BUFFER_SIZE) {
         acc_buffer_.pop_front();
     }
-    double acc_variance = -1.0;
+    double acc_variance = 0.0001;
     if (acc_buffer_.size() >= ACC_BUFFER_SIZE) {
         double mean = std::accumulate(acc_buffer_.begin(), acc_buffer_.end(), 0.0) / acc_buffer_.size();
         double sq_sum = 0.0;
