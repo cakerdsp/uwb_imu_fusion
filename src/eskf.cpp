@@ -105,11 +105,12 @@ void ESKF::addImuData(const ImuMeasurement& imu) {
         zupt_log_file_.flush();
     }
     
-    bool is_static = (acc_variance >= 0.0 && 
-                      acc_variance < config_.ZUPT_acc_limit && 
-                      gyro_norm < config_.ZIHR_limit);
+    // bool is_static = (acc_variance >= 0.0 && 
+    //                   acc_variance < config_.ZUPT_acc_limit && 
+    //                   gyro_norm < config_.ZIHR_limit);
+    bool is_static = (gyro_norm < config_.ZIHR_limit); // 暂时不使用ZUPT
     if(is_static) {
-        updateZUPT();
+        // updateZUPT();
         if(!last_is_stationary_) {
             static_yaw_ref_ = getYaw(state_.q);
         }
