@@ -228,6 +228,12 @@ void ESKF::update(const UwbMeasurement& uwb) {
 
     Eigen::VectorXd delta_x = K * residual;
 
+    if(delta_x.segment<3>(0).norm() > 0.3) {
+        // 如果位置更新过大，说明可能是异常数据，直接丢弃
+        std::cout << "[ESKF] UWB update skipped due to large position correction." << std::endl;
+        return;
+    }
+
     // P 更新
     Eigen::Matrix<double, 15, 15> I = Eigen::Matrix<double, 15, 15>::Identity();
     Eigen::Matrix<double, 15, 15> I_KH = I - K * H;
