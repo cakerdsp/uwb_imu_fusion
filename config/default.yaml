@@ -42,7 +42,7 @@ uwb_imu_fusion:
       acc_bias_limit: 0.1        # 加速度计偏置限幅，单位：m/s²
       gyro_bias_limit: 0.1       # 陀螺仪偏置 限幅，单位：rad/s
       ZUPT_acc_limit: 0.025           # 速度限幅，单位：m/s
-      ZIHR_limit: 0.03         # 角速度限幅，单位：rad
+      ZIHR_limit: 0.25         # 角速度限幅，单位：rad
       ZUPT_velocity_limit: 0.3         # ZUPT 速度观测值，单位：m/s
 
 
