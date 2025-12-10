@@ -240,13 +240,13 @@ void ESKF::predict(const ImuMeasurement& imu) {
     // P 更新
     P_ = Fx * P_ * Fx.transpose() + Fi * (Q_ * dt) * Fi.transpose();
     P_ = 0.5 * (P_ + P_.transpose());
-    info_count_++;
-    if(info_count_ >= INFO_PRINT_INTERVAL) {
-        std::cout << "[ESKF] : " <<
-         "p :[" << state_.p.transpose() << "], v :[" << state_.v.transpose() << "], ba :[" << state_.ba.transpose() << "], bg :[" << state_.bg.transpose() << "]"
-         << std::endl;
-        info_count_ = 0;
-    }
+    // info_count_++;
+    // if(info_count_ >= INFO_PRINT_INTERVAL) {
+    //     std::cout << "[ESKF] : " <<
+    //      "p :[" << state_.p.transpose() << "], v :[" << state_.v.transpose() << "], ba :[" << state_.ba.transpose() << "], bg :[" << state_.bg.transpose() << "]"
+    //      << std::endl;
+    //     info_count_ = 0;
+    // }
 }
 
 // --------------------------------------------------------------------------------
