@@ -37,7 +37,7 @@ uwb_imu_fusion:
       gyro_noise_std: 0.05
       acc_bias_walk_std: 0.01
       gyro_bias_walk_std: 0.01
-      uwb_noise_std: 0.15
+      uwb_noise_std: 0.20
       # 【新增】Bias 限幅阈值
       acc_bias_limit: 0.1        # 加速度计偏置限幅，单位：m/s²
       gyro_bias_limit: 0.1       # 陀螺仪偏置 限幅，单位：rad/s
