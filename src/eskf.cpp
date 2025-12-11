@@ -266,7 +266,7 @@ void ESKF::update(const UwbMeasurement& uwb) {
 
     double mahalanobis_sq = (residual * residual) / S;
     if(mahalanobis_sq > config_.mahalanobis_threshold) {
-        std::cout << "[ESKF] Mahalanobis distance is too large. Skipping update." << std::endl;
+        std::cout << "[ESKF] Mahalanobis distance square is " << mahalanobis_sq <<", too large. Skipping update." << std::endl;
         return;
     }
 
