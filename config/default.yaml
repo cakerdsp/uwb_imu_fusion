@@ -44,6 +44,7 @@ uwb_imu_fusion:
       ZUPT_acc_limit: 0.025           # 速度限幅，单位：m/s
       ZIHR_limit: 0.25         # 角速度限幅，单位：rad
       ZUPT_velocity_limit: 0.3         # ZUPT 速度观测值，单位：m/s
+      mahalanobis_threshold: 11.35      # 马氏距离阈值
 
 
     # ==========================

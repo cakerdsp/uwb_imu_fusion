@@ -1,7 +1,10 @@
 // src/uwb_driver_node.cpp
 #include <rclcpp/rclcpp.hpp>
 #include "serial_reader.hpp"
-#include "uwb_imu_fusion/msg/uwb.hpp" // 生成的消息头文件
+#include "uwb_imu_fusion/msg/uwb.hpp"
+#include <algorithm>
+#include <vector>
+#include <numeric>
 
 namespace uwb_imu_fusion {
 
@@ -57,11 +60,30 @@ private:
             
             msg.tag_id = frame.tag_id;
 
-            // 填充基站数据
+            // 填充基站数据并按照 q_value 升序排序
+            std::vector<int> anchor_ids;
+            std::vector<double> dists;
+            std::vector<double> q_values;
+            
             for (const auto& anchor : frame.anchors) {
-                msg.anchor_ids.push_back(anchor.id);
-                msg.dists.push_back(anchor.dist);
-                msg.q_values.push_back(anchor.q_value);
+                anchor_ids.push_back(anchor.id);
+                dists.push_back(anchor.dist);
+                q_values.push_back(anchor.q_value);
+            }
+            
+            // 创建索引数组并按照 q_value 升序排序
+            std::vector<size_t> indices(anchor_ids.size());
+            std::iota(indices.begin(), indices.end(), 0);
+            std::sort(indices.begin(), indices.end(), 
+                     [&q_values](size_t i1, size_t i2) {
+                         return q_values[i1] < q_values[i2];
+                     });
+            
+            // 按照排序后的索引填充消息
+            for (size_t idx : indices) {
+                msg.anchor_ids.push_back(anchor_ids[idx]);
+                msg.dists.push_back(dists[idx]);
+                msg.q_values.push_back(q_values[idx]);
             }
 
             // 填充 IMU 数据 (如果有)

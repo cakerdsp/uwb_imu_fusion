@@ -249,6 +249,11 @@ void ESKF::update(const UwbMeasurement& uwb) {
     if (dist_pred < 1e-3) return;
 
     double residual = uwb.dist - dist_pred;
+    // 疑似有点太暴力了，先注释掉
+    // if(fabs(residual) > 3 * config_.uwb_noise_std) {
+    //     std::cout << "[ESKF] Residual is too large. Skipping update." << std::endl;
+    //     return;
+    // }
 
     // 【修改点 5】 H 变为 1x15
     Eigen::Matrix<double, 1, 15> H = Eigen::Matrix<double, 1, 15>::Zero();
@@ -259,15 +264,21 @@ void ESKF::update(const UwbMeasurement& uwb) {
     R_uwb_ = std::pow(config_.uwb_noise_std, 2) * (1 + (uwb.q_value - 6 > 0 ? uwb.q_value - 6 : 0)); // 根据 q 值调整观测噪声
     double S = (H * P_ * H.transpose())(0, 0) + R_uwb_;
 
+    double mahalanobis_sq = (residual * residual) / S;
+    if(mahalanobis_sq > config_.mahalanobis_threshold) {
+        std::cout << "[ESKF] Mahalanobis distance is too large. Skipping update." << std::endl;
+        return;
+    }
+
     Eigen::VectorXd K = P_ * H.transpose() / S; // (15x1)
 
     Eigen::VectorXd delta_x = K * residual;
-
-    if(delta_x.segment<3>(0).norm() > 0.3) {
-        // 如果位置更新过大，说明可能是异常数据，直接丢弃
-        std::cout << "[ESKF] UWB update skipped due to large position correction." << std::endl;
-        return;
-    }
+    // 如果位置被一次更新带偏，会导致很严重的后果，所以这里先不用
+    // if(delta_x.segment<3>(0).norm() > 0.3) {
+    //     // 如果位置更新过大，说明可能是异常数据，直接丢弃
+    //     std::cout << "[ESKF] UWB update skipped due to large position correction." << std::endl;
+    //     return;
+    // }
 
     // P 更新
     Eigen::Matrix<double, 15, 15> I = Eigen::Matrix<double, 15, 15>::Identity();

@@ -28,6 +28,7 @@ UwbLocationNode::UwbLocationNode(const rclcpp::NodeOptions& options)
         config.ZUPT_acc_limit = this->get_parameter("eskf.ZUPT_acc_limit").as_double();
         config.ZIHR_limit = this->get_parameter("eskf.ZIHR_limit").as_double();
         config.ZUPT_velocity_limit = this->get_parameter("eskf.ZUPT_velocity_limit").as_double();
+        config.mahalanobis_threshold = this->get_parameter("eskf.mahalanobis_threshold").as_double();
         fusion_algo_->setConfig(config);
     } else {
         fusion_algo_ = std::make_unique<DummyAlgo>();
@@ -103,6 +104,7 @@ void UwbLocationNode::load_parameters() {
     declare_param("eskf.ZUPT_acc_limit", 0.05);
     declare_param("eskf.ZIHR_limit", 0.01);
     declare_param("eskf.ZUPT_velocity_limit", 0.1);
+    declare_param("eskf.mahalanobis_threshold", 5.0);
 
     world_frame_id_ = this->get_parameter("frames.world_frame_id").as_string();
     body_frame_id_ = this->get_parameter("frames.body_frame_id").as_string();
@@ -257,8 +259,9 @@ void UwbLocationNode::uwb_callback(const uwb_imu_fusion::msg::UWB::SharedPtr msg
             if(show_raw_uwb_position_) {
                 publish_raw_uwb_position(msg);
             }
-            // 处理 UWB 数据 (Update)
-            for (size_t i = 0; i < msg->anchor_ids.size() && i < msg->dists.size() && i < msg->q_values.size(); ++i) {
+            // 处理 UWB 数据 (Update)（uwb数据已经按照q_value升序排序）只取前4个数据
+            for (size_t i = 0; i < msg->anchor_ids.size() && i < msg->dists.size() && i < msg->q_values.size() && i < 4; ++i) {
+            // for (size_t i = 0; i < msg->anchor_ids.size() && i < msg->dists.size() && i < msg->q_values.size(); ++i) {
                 int anchor_id = msg->anchor_ids[i];
                 if (anchors_.find(anchor_id) == anchors_.end()) continue;
                 if (msg->q_values[i] > nlos_q_threshold_) {

@@ -51,6 +51,7 @@ struct Config {
     double ZUPT_acc_limit = 0.05; // 例如 0.05 m/s^2
     double ZIHR_limit = 0.01; // 例如 0.01 rad/s
     double ZUPT_velocity_limit = 0.1; // 例如 0.1 m/s
+    double mahalanobis_threshold = 5.0; // 例如 5.0
 };
 
 // 设计的策略模式接口，兼容 ESKF 和 Graph
