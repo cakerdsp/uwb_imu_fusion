@@ -395,12 +395,17 @@ void ESKF::updateZIHR() {
 
     // 3. R 矩阵 (1x1)
     Eigen::Matrix<double, 1, 1> R;
-    R(0, 0) = 1e-5; // 强约束
+    R(0, 0) = 1e-2; // 强约束
 
     // 4. EKF 更新
     // 注意这里 S 是标量，求逆就是取倒数，计算极快
     Eigen::Matrix<double, 1, 1> S = H * P_ * H.transpose() + R;
     Eigen::Matrix<double, 15, 1> K = P_ * H.transpose() * S.inverse();
+
+    K.block<3, 1>(0, 0).setZero();  // Pos (索引0-2) 不准动
+    K.block<3, 1>(3, 0).setZero();  // Vel (索引3-5) 不准动
+    K.block<3, 1>(9, 0).setZero();  // Acc Bias (索引9-11) 不准动
+    K.block<3, 1>(12, 0).setZero();
     Eigen::VectorXd delta_x = K * residual;
 
     // 更新 P
