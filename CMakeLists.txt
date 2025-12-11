@@ -27,7 +27,7 @@ find_package(Eigen3 REQUIRED)
 find_package(eigen3_cmake_module REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/UWB.msg"
+  "msg/Uwb.msg"
   DEPENDENCIES geometry_msgs std_msgs
 )
 
@@ -170,6 +170,7 @@ ament_export_dependencies(
   tf2
   tf2_geometry_msgs
   Eigen3
+  rosidl_default_runtime
 )
 
 # 测试（可选）
