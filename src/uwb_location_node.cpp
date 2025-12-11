@@ -44,7 +44,7 @@ UwbLocationNode::UwbLocationNode(const rclcpp::NodeOptions& options)
         imu_topic, qos, 
         std::bind(&UwbLocationNode::imu_callback, this, std::placeholders::_1));
 
-    uwb_sub_ = this->create_subscription<uwb_imu_fusion::msg::UWB>(
+    uwb_sub_ = this->create_subscription<uwb_imu_fusion::msg::Uwb>(
         uwb_topic, qos,
         std::bind(&UwbLocationNode::uwb_callback, this, std::placeholders::_1));
 
@@ -220,7 +220,7 @@ void UwbLocationNode::imu_callback(const sensor_msgs::msg::Imu::SharedPtr msg) {
 // -------------------------------------------------------------------------
 // UWB 回调: 处理来自 uwb_pub_node 的 UWB 数据
 // -------------------------------------------------------------------------
-void UwbLocationNode::uwb_callback(const uwb_imu_fusion::msg::UWB::SharedPtr msg) {
+void UwbLocationNode::uwb_callback(const uwb_imu_fusion::msg::Uwb::SharedPtr msg) {
     rclcpp::Time current_ros_time = msg->header.stamp;
     double current_ts = current_ros_time.seconds();
 
@@ -483,7 +483,7 @@ void UwbLocationNode::publish_anchors_viz() {
     viz_pub_->publish(msg);
 }
 
-void UwbLocationNode::publish_raw_uwb_position(const uwb_imu_fusion::msg::UWB::SharedPtr msg) {
+void UwbLocationNode::publish_raw_uwb_position(const uwb_imu_fusion::msg::Uwb::SharedPtr msg) {
     vec3d anchorArray[MAX_AHCHOR_NUMBER];
     int distanceArray[MAX_AHCHOR_NUMBER];
 

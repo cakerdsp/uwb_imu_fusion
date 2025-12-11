@@ -24,13 +24,13 @@ private:
     
     // 回调函数
     void imu_callback(const sensor_msgs::msg::Imu::SharedPtr msg);
-    void uwb_callback(const uwb_imu_fusion::msg::UWB::SharedPtr msg);
+    void uwb_callback(const uwb_imu_fusion::msg::Uwb::SharedPtr msg);
     void timer_callback();
 
     // 发布函数
     void publish_odometry(const NavState& state, const rclcpp::Time& stamp);
     void publish_tf(const NavState& state, const rclcpp::Time& stamp);
-    void publish_raw_uwb_position(const uwb_imu_fusion::msg::UWB::SharedPtr msg);
+    void publish_raw_uwb_position(const uwb_imu_fusion::msg::Uwb::SharedPtr msg);
 
 private:
     // --- 状态机定义 ---
@@ -53,7 +53,7 @@ private:
 
     // --- ROS 组件 ---
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
-    rclcpp::Subscription<uwb_imu_fusion::msg::UWB>::SharedPtr uwb_sub_;
+    rclcpp::Subscription<uwb_imu_fusion::msg::Uwb>::SharedPtr uwb_sub_;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
     rclcpp::TimerBase::SharedPtr timer_;

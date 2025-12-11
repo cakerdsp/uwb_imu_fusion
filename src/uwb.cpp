@@ -36,7 +36,7 @@ public:
 
         // 3. 创建发布者
         std::string topic = this->get_parameter("topics.uwb_pub").as_string();
-        pub_ = this->create_publisher<uwb_imu_fusion::msg::UWB>(topic, 10);
+        pub_ = this->create_publisher<uwb_imu_fusion::msg::Uwb>(topic, 10);
 
         // 4. 创建高频定时器 (例如 100Hz，甚至更高，取决于你对延迟的要求)
         // 这里的频率决定了“去串口缓冲区捞数据”的频率
@@ -52,7 +52,7 @@ private:
 
         // 遍历解析出的每一帧，转换为 ROS 消息并发布
         for (const auto& frame : frames) {
-            auto msg = uwb_imu_fusion::msg::UWB();
+            auto msg = uwb_imu_fusion::msg::Uwb();
             
             // 填充 Header
             msg.header.stamp = this->now(); // 这里打上 ROS 接收时间戳
@@ -101,7 +101,7 @@ private:
     }
 
     SerialReader serial_;
-    rclcpp::Publisher<uwb_imu_fusion::msg::UWB>::SharedPtr pub_;
+    rclcpp::Publisher<uwb_imu_fusion::msg::Uwb>::SharedPtr pub_;
     rclcpp::TimerBase::SharedPtr timer_;
     std::string frame_id_;
 };
