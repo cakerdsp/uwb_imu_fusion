@@ -36,7 +36,7 @@ private:
     std::deque<double> acc_buffer_;
     const int ACC_BUFFER_SIZE = 20;
     int info_count_ = 0;
-    const int INFO_PRINT_INTERVAL = 50;
+    const int INFO_PRINT_INTERVAL = 400;
 
     NavState state_;
 
