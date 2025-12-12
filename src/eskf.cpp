@@ -232,7 +232,7 @@ void ESKF::predict(const ImuMeasurement& imu) {
     info_count_++;
     if(info_count_ >= INFO_PRINT_INTERVAL) {
         std::cout << "[ESKF] : " <<
-         "p :[" << state_.p.transpose() << "], v :[" << state_.v.transpose() << "], a :[" << acc_unbiased.transpose() <<  "], ba :[" << state_.ba.transpose() << "], bg :[" << state_.bg.transpose() << "]"
+         "p :[" << state_.p.transpose() << "], v :[" << state_.v.transpose() << "], a :[" << acc_world.transpose() <<  "], ba :[" << state_.ba.transpose() << "], bg :[" << state_.bg.transpose() << "]"
          << std::endl;
         info_count_ = 0;
     }
