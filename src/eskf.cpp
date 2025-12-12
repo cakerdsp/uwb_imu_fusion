@@ -169,9 +169,8 @@ void ESKF::predict(const ImuMeasurement& imu) {
     double dt = imu.timestamp - last_imu_time_;
     double dt2 = dt * dt;
 
-    imu.acc *= state_.g_unit_factor;
     // 1. 名义状态递推
-    Eigen::Vector3d acc_unbiased = imu.acc - state_.ba;
+    Eigen::Vector3d acc_unbiased = imu.acc*state_.g_unit_factor - state_.ba;
     Eigen::Vector3d gyro_unbiased = imu.gyro - state_.bg;
 
     // 姿态更新
