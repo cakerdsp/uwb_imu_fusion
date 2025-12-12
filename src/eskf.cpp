@@ -89,6 +89,7 @@ void ESKF::initialize(const NavState& init_state) {
     state_ = init_state;
     last_imu_time_ = init_state.timestamp;
     state_.g << 0.0, 0.0, -9.81;
+    state_.g_unit_factor = init_state.g_unit_factor;
     // 初始化时，重置协方差
     P_.setIdentity();
     // 同样需要给重力初始方差，否则它不会收敛
@@ -168,6 +169,7 @@ void ESKF::predict(const ImuMeasurement& imu) {
     double dt = imu.timestamp - last_imu_time_;
     double dt2 = dt * dt;
 
+    imu.acc *= state_.g_unit_factor;
     // 1. 名义状态递推
     Eigen::Vector3d acc_unbiased = imu.acc - state_.ba;
     Eigen::Vector3d gyro_unbiased = imu.gyro - state_.bg;
@@ -410,7 +412,8 @@ void ESKF::updateZIHR() {
 
     // 更新 P
     Eigen::Matrix<double, 15, 15> I = Eigen::Matrix<double, 15, 15>::Identity();
-    P_ = (I - K * H) * P_;
+    Eigen::Matrix<double, 15, 15> I_KH = I - K * H;
+    P_ = I_KH * P_ * I_KH.transpose() + K * R * K.transpose();
 
     // 5. 注入误差
     state_.p += delta_x.segment<3>(0);

@@ -13,6 +13,7 @@ struct NavState {
     Eigen::Vector3d bg;   // 陀螺仪零偏
     Eigen::Vector3d ba;   // 加速度计零偏
     Eigen::Vector3d g;    // 重力 (新增)
+    double g_unit_factor;
 
     NavState() {
         timestamp = 0.0;
