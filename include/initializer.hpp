@@ -44,6 +44,9 @@ public:
         double ay = acc_avg.y();
         double az = acc_avg.z();
 
+        std::cout << "[Initializer] IMU Align - Acc Avg: [" << ax << ", " << ay << ", " << az << "]" << std::endl;
+        std::cout << "[Initializer] IMU Align - ACC Norm: " << acc_avg.norm() << std::endl;
+
         // 利用反正切计算欧拉角
         double roll = std::atan2(ay, az);
         double pitch = std::atan2(-ax, std::sqrt(ay*ay + az*az));
