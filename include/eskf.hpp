@@ -37,6 +37,8 @@ private:
     const int ACC_BUFFER_SIZE = 20;
     int info_count_ = 0;
     const int INFO_PRINT_INTERVAL = 400;
+    int static_check_count_ = 0;
+    const int STATIC_CHECK_INTERVAL = 400;
 
     NavState state_;
 

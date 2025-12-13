@@ -91,7 +91,12 @@ void ESKF::initialize(const NavState& init_state) {
     state_.g << 0.0, 0.0, -9.81;
     state_.g_unit_factor = init_state.g_unit_factor;
     // 初始化时，重置协方差
-    P_.setIdentity();
+    P_.setZero();
+    P_.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity() * 1e-4;
+    P_.block<3, 3>(3, 3) = Eigen::Matrix3d::Identity() * 1e-4;
+    P_.block<3, 3>(6, 6) = Eigen::Matrix3d::Identity() * 1e-3;
+    P_.block<3, 3>(9, 9) = Eigen::Matrix3d::Identity() * 1e-2;
+    P_.block<3, 3>(12, 12) = Eigen::Matrix3d::Identity() * 1e-4;
     // 同样需要给重力初始方差，否则它不会收敛
     // P_.block<3, 3>(15, 15) *= 0.01; 
     
@@ -139,7 +144,6 @@ void ESKF::addImuData(const ImuMeasurement& imu) {
     //                    << vel_norm << "\n";
     //     zupt_log_file_.flush();
     // }
-    
     // bool is_static = (acc_variance >= 0.0 && 
     //                   acc_variance < config_.ZUPT_acc_limit && 
     //                   gyro_norm < config_.ZIHR_limit);
@@ -148,8 +152,15 @@ void ESKF::addImuData(const ImuMeasurement& imu) {
         // updateZUPT();
         if(!last_is_stationary_) {
             static_yaw_ref_ = getYaw(state_.q);
+            static_check_count_ = 0;// 刚停下，重置计数，准备开始计时
         }
-        updateZIHR();
+        static_check_count_++; // 只有静止时才计数
+        if(static_check_count_ >= STATIC_CHECK_INTERVAL) {
+            updateZIHR();
+            static_check_count_ = 0; // 只有触发了才清零
+        }
+    } else {
+        static_check_count_ = 0;// 运动时清零，防止积累虚假计数
     }
     last_is_stationary_ = is_static;
 }
@@ -214,20 +225,20 @@ void ESKF::predict(const ImuMeasurement& imu) {
 
     // 【修改点 4】 Fi 变为 15x12
     Eigen::Matrix<double, 15, 12> Fi = Eigen::Matrix<double, 15, 12>::Zero();
-    Fi.block<3, 3>(3, 0) = R;   // v noise
+    Fi.block<3, 3>(3, 0) = Eigen::Matrix3d::Identity();   // v noise
     Fi.block<3, 3>(6, 3) = Eigen::Matrix3d::Identity(); // theta noise
     Fi.block<3, 3>(9, 6) = Eigen::Matrix3d::Identity(); // ba noise
     Fi.block<3, 3>(12, 9) = Eigen::Matrix3d::Identity();// bg noise
     // 重力通常建模为常量 (noise=0)，所以 Fi 对应重力的部分为 0
     // Q_ 初始化，此时未放入时间间因子
     Q_.setZero();
-    Q_.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity() * std::pow(config_.acc_noise_std, 2);
-    Q_.block<3, 3>(3, 3) = Eigen::Matrix3d::Identity() * std::pow(config_.gyro_noise_std, 2);
-    Q_.block<3, 3>(6, 6) = Eigen::Matrix3d::Identity() * std::pow(config_.acc_bias_walk_std, 2);
-    Q_.block<3, 3>(9, 9) = Eigen::Matrix3d::Identity() * std::pow(config_.gyro_bias_walk_std, 2);
+    Q_.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity() * std::pow(config_.acc_noise_std, 2) * dt2;
+    Q_.block<3, 3>(3, 3) = Eigen::Matrix3d::Identity() * std::pow(config_.gyro_noise_std, 2) * dt2;
+    Q_.block<3, 3>(6, 6) = Eigen::Matrix3d::Identity() * std::pow(config_.acc_bias_walk_std, 2) * dt;
+    Q_.block<3, 3>(9, 9) = Eigen::Matrix3d::Identity() * std::pow(config_.gyro_bias_walk_std, 2) * dt;
 
     // P 更新
-    P_ = Fx * P_ * Fx.transpose() + Fi * (Q_ * dt) * Fi.transpose();
+    P_ = Fx * P_ * Fx.transpose() + Fi * (Q_) * Fi.transpose();
     P_ = 0.5 * (P_ + P_.transpose());
     info_count_++;
     if(info_count_ >= INFO_PRINT_INTERVAL) {
@@ -265,11 +276,11 @@ void ESKF::update(const UwbMeasurement& uwb) {
     R_uwb_ = std::pow(config_.uwb_noise_std, 2) * (1 + (uwb.q_value - 6 > 0 ? uwb.q_value - 6 : 0)); // 根据 q 值调整观测噪声
     double S = (H * P_ * H.transpose())(0, 0) + R_uwb_;
 
-    double mahalanobis_sq = (residual * residual) / S;
-    if(mahalanobis_sq > config_.mahalanobis_threshold) {
-        std::cout << "[ESKF] Mahalanobis distance square is " << mahalanobis_sq <<", too large. Skipping update." << std::endl;
-        return;
-    }
+    // double mahalanobis_sq = (residual * residual) / S;
+    // if(mahalanobis_sq > config_.mahalanobis_threshold) {
+    //     std::cout << "[ESKF] Mahalanobis distance square is " << mahalanobis_sq <<", too large. Skipping update." << std::endl;
+    //     return;
+    // }
 
     Eigen::VectorXd K = P_ * H.transpose() / S; // (15x1)
 
@@ -392,27 +403,30 @@ void ESKF::updateZIHR() {
     // 2. H 矩阵 (1x15)
     // Yaw 误差位于状态向量索引 8
     Eigen::Matrix<double, 1, 15> H = Eigen::Matrix<double, 1, 15>::Zero();
-    H(0, 8) = 1.0;
+    Eigen::Matrix3d R = state_.q.toRotationMatrix();
+    // 观测的是世界系 Z 轴误差，将其投影回机体系
+    // H_theta = [0,0,1] * R = R 的第三行
+    H.block<1, 3>(0, 6) = R.row(2);
 
     // 3. R 矩阵 (1x1)
-    Eigen::Matrix<double, 1, 1> R;
-    R(0, 0) = 1e-2; // 强约束
+    Eigen::Matrix<double, 1, 1> R_meas;
+    R_meas(0, 0) = 1e-2; // 强约束
 
     // 4. EKF 更新
     // 注意这里 S 是标量，求逆就是取倒数，计算极快
-    Eigen::Matrix<double, 1, 1> S = H * P_ * H.transpose() + R;
+    Eigen::Matrix<double, 1, 1> S = H * P_ * H.transpose() + R_meas;
     Eigen::Matrix<double, 15, 1> K = P_ * H.transpose() * S.inverse();
 
     K.block<3, 1>(0, 0).setZero();  // Pos (索引0-2) 不准动
     K.block<3, 1>(3, 0).setZero();  // Vel (索引3-5) 不准动
     K.block<3, 1>(9, 0).setZero();  // Acc Bias (索引9-11) 不准动
-    K.block<3, 1>(12, 0).setZero();
+    // K.block<3, 1>(12, 0).setZero();
     Eigen::VectorXd delta_x = K * residual;
 
     // 更新 P
     Eigen::Matrix<double, 15, 15> I = Eigen::Matrix<double, 15, 15>::Identity();
     Eigen::Matrix<double, 15, 15> I_KH = I - K * H;
-    P_ = I_KH * P_ * I_KH.transpose() + K * R * K.transpose();
+    P_ = I_KH * P_ * I_KH.transpose() + K * R_meas * K.transpose();
 
     // 5. 注入误差
     state_.p += delta_x.segment<3>(0);
