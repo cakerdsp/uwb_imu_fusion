@@ -31,6 +31,8 @@ uwb_imu_fusion:
     visualization:
       show_raw_uwb_position: true
       show_anchors: true
+      show_filtered_traj: true
+      show_raw_traj: true
 
     eskf:
       acc_noise_std: 0.001

@@ -77,6 +77,16 @@ UwbLocationNode::UwbLocationNode(const rclcpp::NodeOptions& options)
         raw_uwb_pos_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(
             "uwb/raw_position", 10);
     }
+
+    // 轨迹可视化（可选）
+    if (show_filtered_traj_) {
+        filtered_traj_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(
+            "uwb/filtered_trajectory", 10);
+    }
+    if (show_raw_traj_) {
+        raw_traj_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(
+            "uwb/raw_trajectory", 10);
+    }
 }
 
 void UwbLocationNode::load_parameters() {
@@ -99,6 +109,8 @@ void UwbLocationNode::load_parameters() {
     declare_param("eskf.uwb_noise_std", 0.15);
     declare_param("visualization.show_raw_uwb_position", true);
     declare_param("visualization.show_anchors", true);
+    declare_param("visualization.show_filtered_traj", true);
+    declare_param("visualization.show_raw_traj", true);
     declare_param("eskf.acc_bias_limit", 0.1);
     declare_param("eskf.gyro_bias_limit", 0.1);
     declare_param("eskf.ZUPT_acc_limit", 0.05);
@@ -112,6 +124,8 @@ void UwbLocationNode::load_parameters() {
     nlos_q_threshold_ = this->get_parameter("NLOS.nlos_q_threshold").as_double();
     show_raw_uwb_position_ = this->get_parameter("visualization.show_raw_uwb_position").as_bool();
     show_anchors_ = this->get_parameter("visualization.show_anchors").as_bool();
+    show_filtered_traj_ = this->get_parameter("visualization.show_filtered_traj").as_bool();
+    show_raw_traj_ = this->get_parameter("visualization.show_raw_traj").as_bool();
     // 动态加载基站配置
     // 前置条件：必须在构造函数中开启 automatically_declare_parameters_from_overrides(true)
     // list_parameters 只能列出 YAML 中已存在的参数
@@ -392,6 +406,37 @@ void UwbLocationNode::publish_odometry(const NavState& state, const rclcpp::Time
     msg.twist.twist.linear.z = v_body.z();
 
     odom_pub_->publish(msg);
+
+    // 可选：发布滤波轨迹（小球点）
+    if (show_filtered_traj_ && filtered_traj_pub_) {
+        geometry_msgs::msg::Point p;
+        p.x = state.p.x();
+        p.y = state.p.y();
+        p.z = state.p.z();
+        filtered_traj_points_.push_back(p);
+
+        visualization_msgs::msg::Marker traj;
+        traj.header.frame_id = world_frame_id_;
+        traj.header.stamp = stamp;
+        traj.ns = "filtered_traj";
+        traj.id = 0;
+        traj.type = visualization_msgs::msg::Marker::SPHERE_LIST;
+        traj.action = visualization_msgs::msg::Marker::ADD;
+
+        traj.scale.x = 0.08;
+        traj.scale.y = 0.08;
+        traj.scale.z = 0.08;
+
+        traj.color.r = 0.0f;
+        traj.color.g = 0.0f;
+        traj.color.b = 1.0f;   // 蓝色表示滤波轨迹
+        traj.color.a = 1.0f;
+
+        traj.points = filtered_traj_points_;
+        traj.lifetime = rclcpp::Duration::from_seconds(0.0); // 保持整个轨迹
+
+        filtered_traj_pub_->publish(traj);
+    }
 }
 
 void UwbLocationNode::publish_tf(const NavState& state, const rclcpp::Time& stamp) {
@@ -516,6 +561,7 @@ void UwbLocationNode::publish_raw_uwb_position(const uwb_imu_fusion::msg::Uwb::S
     int result = GetLocation(&solution, anchorArray, distanceArray);
 
     if (result >= 0) {
+        // 当前时刻原始三边定位解算点（单点）
         visualization_msgs::msg::Marker marker;
         marker.header.frame_id = world_frame_id_;
         marker.header.stamp = msg->header.stamp;
@@ -541,6 +587,37 @@ void UwbLocationNode::publish_raw_uwb_position(const uwb_imu_fusion::msg::Uwb::S
         marker.lifetime = rclcpp::Duration::from_seconds(0.5);
 
         raw_uwb_pos_pub_->publish(marker);
+
+        // 可选：发布原始三边定位轨迹（小球点）
+        if (show_raw_traj_ && raw_traj_pub_) {
+            geometry_msgs::msg::Point p;
+            p.x = solution.x;
+            p.y = solution.y;
+            p.z = solution.z;
+            raw_traj_points_.push_back(p);
+
+            visualization_msgs::msg::Marker traj;
+            traj.header.frame_id = world_frame_id_;
+            traj.header.stamp = msg->header.stamp;
+            traj.ns = "raw_traj";
+            traj.id = 0;
+            traj.type = visualization_msgs::msg::Marker::SPHERE_LIST;
+            traj.action = visualization_msgs::msg::Marker::ADD;
+
+            traj.scale.x = 0.08;
+            traj.scale.y = 0.08;
+            traj.scale.z = 0.08;
+
+            traj.color.r = 1.0f;   // 红色表示原始三边轨迹
+            traj.color.g = 0.0f;
+            traj.color.b = 0.0f;
+            traj.color.a = 1.0f;
+
+            traj.points = raw_traj_points_;
+            traj.lifetime = rclcpp::Duration::from_seconds(0.0);
+
+            raw_traj_pub_->publish(traj);
+        }
     }
 }
 } // namespace uwb_imu_fusion

@@ -5,6 +5,7 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <tf2_ros/transform_broadcaster.h>
 #include <geometry_msgs/msg/transform_stamped.hpp>
+#include <geometry_msgs/msg/point.hpp>
 #include "uwb_imu_fusion/msg/uwb.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
 #include "visualization_msgs/msg/marker.hpp"
@@ -69,12 +70,20 @@ private:
     double nlos_q_threshold_;
     bool show_raw_uwb_position_;
     bool show_anchors_;
+    bool show_filtered_traj_;
+    bool show_raw_traj_;
 
 
     // 可视化相关
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr viz_pub_;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr raw_uwb_pos_pub_;
     rclcpp::TimerBase::SharedPtr viz_timer_;
+
+    // 轨迹可视化
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr filtered_traj_pub_;
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr raw_traj_pub_;
+    std::vector<geometry_msgs::msg::Point> filtered_traj_points_;
+    std::vector<geometry_msgs::msg::Point> raw_traj_points_;
 
     // 专门用于发布基站的可视化
     void publish_anchors_viz();

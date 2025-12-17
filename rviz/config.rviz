@@ -96,6 +96,34 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /uwb/raw_position
       Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Filtered Trajectory
+      Namespaces:
+        filtered_traj: true
+      Queue Size: 10
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /uwb/filtered_trajectory
+      Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Raw UWB Trajectory
+      Namespaces:
+        raw_traj: true
+      Queue Size: 10
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /uwb/raw_trajectory
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
