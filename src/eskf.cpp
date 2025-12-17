@@ -261,6 +261,12 @@ void ESKF::update(const UwbMeasurement& uwb) {
     if (dist_pred < 1e-3) return;
 
     double residual = uwb.dist - dist_pred;
+    
+    // 因为测不准一般引入正偏置，所以应该是uwb观测值比较大，pred比较小，如果反过来，那么很有可能是imu漂移掉了。
+    if(uwb.dist - dist_pred > 3 * config_.uwb_noise_std) {
+        std::cout << "[ESKF] Residual is too large. Skipping update." << std::endl;
+        return;
+    }
     // 疑似有点太暴力了，先注释掉
     // if(fabs(residual) > 3 * config_.uwb_noise_std) {
     //     std::cout << "[ESKF] Residual is too large. Skipping update." << std::endl;
