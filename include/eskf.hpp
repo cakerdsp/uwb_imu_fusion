@@ -22,6 +22,12 @@ public:
     NavState getCurrentState() override;
 
 private:
+    struct state_t {
+        double timestamp;
+        NavState state;
+        Eigen::Matrix<double, 15, 15> P_;
+    };
+
     void predict(const ImuMeasurement& imu);
     void update(const UwbMeasurement& uwb);
     void updateZUPT(); // 零速修正 (Zero Velocity Update)
@@ -33,12 +39,21 @@ private:
     double last_imu_time_ = 0.0;
     double static_yaw_ref_ = 0.0;
     bool last_is_stationary_ = false;
+
     std::deque<double> acc_buffer_;
     const int ACC_BUFFER_SIZE = 20;
+
     int info_count_ = 0;
     const int INFO_PRINT_INTERVAL = 400;
+
     int static_check_count_ = 0;
     const int STATIC_CHECK_INTERVAL = 400;
+
+    std::deque<ImuMeasurement> imu_buffer_;
+    const int IMU_BUFFER_SIZE = 20;
+
+    std::deque<state_t> state_buffer_;
+    const int STATE_BUFFER_SIZE = 20;
 
     NavState state_;
 

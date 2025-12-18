@@ -115,7 +115,23 @@ void ESKF::addImuData(const ImuMeasurement& imu) {
         last_imu_time_ = imu.timestamp;
         return; 
     }
+    // 将IMU数据存入缓冲区
+    imu_buffer_.push_back(imu);
+    if (imu_buffer_.size() > IMU_BUFFER_SIZE) {
+        imu_buffer_.pop_front();
+    }
+    // 预测
     predict(imu);
+    // 将状态存入缓冲区
+    state_t st_;
+    st_.timestamp = imu.timestamp;
+    st_.state = state_;
+    st_.P_ = P_;
+    state_buffer_.push_back(st_);
+    if (state_buffer_.size() > STATE_BUFFER_SIZE) {
+        state_buffer_.pop_front();
+    }
+
     last_imu_time_ = imu.timestamp;
 
     // 零速修正和航向修正
@@ -168,7 +184,29 @@ void ESKF::addImuData(const ImuMeasurement& imu) {
 bool ESKF::addUwbData(const UwbMeasurement& uwb) {
     if (!initialized_) return false;
     if (uwb.dist <= 0) return false;
+    int i = -1;
+    for(i = state_buffer_.size() - 1; i >= 0; i--) {
+        if(uwb.timestamp > state_buffer_[i].timestamp) {
+            state_ = state_buffer_[i].state;
+            P_ = state_buffer_[i].P_;
+            break;
+        }
+    }
+    if(i == -1) {
+        std::cout << "uwb is too old! " << uwb.timestamp << std::endl;
+        return false;
+    }
     update(uwb);
+    last_imu_time_ = uwb.timestamp;
+
+    for(int j = i + 1; j < state_buffer_.size(); j++) {
+        predict(imu_buffer_[j]);
+        last_imu_time_ = imu_buffer_[j].timestamp;
+        state_buffer_[j].state = state_;
+        state_buffer_[j].P_ = P_;
+        state_buffer_[j].timestamp = imu_buffer_[j].timestamp;
+    }
+
     return true;
 }
 
