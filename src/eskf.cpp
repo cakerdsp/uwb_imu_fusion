@@ -278,13 +278,13 @@ void ESKF::predict(const ImuMeasurement& imu) {
     // P 更新
     P_ = Fx * P_ * Fx.transpose() + Fi * (Q_) * Fi.transpose();
     P_ = 0.5 * (P_ + P_.transpose());
-    info_count_++;
-    if(info_count_ >= INFO_PRINT_INTERVAL) {
-        std::cout << "[ESKF] : " <<
-         "p :[" << state_.p.transpose() << "], v :[" << state_.v.transpose() << "], a :[" << acc_world.transpose() <<  "], ba :[" << state_.ba.transpose() << "], bg :[" << state_.bg.transpose() << "]"
-         << std::endl;
-        info_count_ = 0;
-    }
+    // info_count_++;
+    // if(info_count_ >= INFO_PRINT_INTERVAL) {
+    //     std::cout << "[ESKF] : " <<
+    //      "p :[" << state_.p.transpose() << "], v :[" << state_.v.transpose() << "], a :[" << acc_world.transpose() <<  "], ba :[" << state_.ba.transpose() << "], bg :[" << state_.bg.transpose() << "]"
+    //      << std::endl;
+    //     info_count_ = 0;
+    // }
 }
 
 // --------------------------------------------------------------------------------
@@ -301,10 +301,10 @@ void ESKF::update(const UwbMeasurement& uwb) {
     double residual = uwb.dist - dist_pred;
     
     // 因为测不准一般引入正偏置，所以应该是uwb观测值比较大，pred比较小，如果反过来，那么很有可能是imu漂移掉了。
-    if(uwb.dist - dist_pred > 3 * config_.uwb_noise_std) {
-        std::cout << "[ESKF] Residual is too large. Skipping update." << std::endl;
-        return;
-    }
+    // if(uwb.dist - dist_pred > 3 * config_.uwb_noise_std) {
+    //     std::cout << "[ESKF] Residual is too large. Skipping update." << std::endl;
+    //     return;
+    // }
     // 疑似有点太暴力了，先注释掉
     // if(fabs(residual) > 3 * config_.uwb_noise_std) {
     //     std::cout << "[ESKF] Residual is too large. Skipping update." << std::endl;

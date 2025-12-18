@@ -423,9 +423,9 @@ void UwbLocationNode::publish_odometry(const NavState& state, const rclcpp::Time
         traj.type = visualization_msgs::msg::Marker::SPHERE_LIST;
         traj.action = visualization_msgs::msg::Marker::ADD;
 
-        traj.scale.x = 0.08;
-        traj.scale.y = 0.08;
-        traj.scale.z = 0.08;
+        traj.scale.x = 0.02;
+        traj.scale.y = 0.02;
+        traj.scale.z = 0.02;
 
         traj.color.r = 0.0f;
         traj.color.g = 0.0f;
@@ -604,9 +604,9 @@ void UwbLocationNode::publish_raw_uwb_position(const uwb_imu_fusion::msg::Uwb::S
             traj.type = visualization_msgs::msg::Marker::SPHERE_LIST;
             traj.action = visualization_msgs::msg::Marker::ADD;
 
-            traj.scale.x = 0.08;
-            traj.scale.y = 0.08;
-            traj.scale.z = 0.08;
+            traj.scale.x = 0.02;
+            traj.scale.y = 0.02;
+            traj.scale.z = 0.02;
 
             traj.color.r = 1.0f;   // 红色表示原始三边轨迹
             traj.color.g = 0.0f;
